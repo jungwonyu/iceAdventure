@@ -17,7 +17,9 @@ let isPaused = false;
 let pauseButton;
 let distance = 0;
 let distanceText;
+let bossAppeared = false;
 
+// ------------------------------------------------------------------------------------------ 기본 함수들
 function preload() {
 	// 배경
   this.load.image('startBackground', 'assets/images/start_background.png');
@@ -39,12 +41,12 @@ function preload() {
   this.load.image('repair', 'assets/images/repair.png');
 
   // 총알
-  this.load.image('enemy_bullet', 'assets/images/enemy_bullet.png');
-  this.load.image('player_bullet', 'assets/images/player_bullet.png');
+  this.load.image('enemyBullet', 'assets/images/enemy_bullet.png');
+  this.load.image('playerBullet', 'assets/images/player_bullet.png');
 
   // 적
   this.load.image('enemy1', 'assets/images/enemy1.png');
-  this.load.image('enemy1_ice', 'assets/images/enemy1_ice.png');
+  this.load.image('enemy1Ice', 'assets/images/enemy1_ice.png');
   this.load.image('enemy2', 'assets/images/enemy2.png');
   this.load.spritesheet('enemy3', 'assets/images/enemy3.png', { frameWidth: 300, frameHeight: 340 });
 
@@ -63,18 +65,21 @@ function preload() {
   // 사운드
   this.load.audio('bgm', 'assets/sounds/bgm.mp3');
   this.load.audio('bossBgm', 'assets/sounds/boss_bgm.mp3');
-  this.load.audio('button', 'assets/sounds/button.mp3');
+  this.load.audio('buttonSound', 'assets/sounds/button.mp3');
   this.load.audio('coinSound', 'assets/sounds/coin.mp3');
   this.load.audio('hitSound', 'assets/sounds/hit.mp3');
   this.load.audio('explosionSound', 'assets/sounds/explosion.mp3');
+  this.load.audio('enemyBulletSound', 'assets/sounds/enemy_bullet.mp3');
 }
 
 function create() {
   this.bgm = this.sound.add('bgm', { loop: true, volume: 0.5 });
   this.bossBgm = this.sound.add('bossBgm', { loop: true, volume: 0.5 });
+  this.buttonSound = this.sound.add('buttonSound');
   this.coinSound = this.sound.add('coinSound');
   this.hitSound = this.sound.add('hitSound');
   this.explosionSound = this.sound.add('explosionSound');
+  this.enemyBulletSound = this.sound.add('enemyBulletSound');
 
   // 첫화면 배경 추가
   backgroundImg = this.add.image(this.scale.width / 2, this.scale.height / 2, 'startBackground')
@@ -122,13 +127,13 @@ function create() {
   startButton.setInteractive({ useHandCursor: true });
   startButton.on('pointerdown', () => {
     howToButton.destroy();
-    this.sound.play('button');
+    this.buttonSound.play();
     startGame.call(this);
   });
 
   howToButton.setInteractive({ useHandCursor: true });
   howToButton.on('pointerdown', () => {
-    this.sound.play('button');
+    this.buttonSound.play();
     showHowToPopup.call(this);
   });
 
@@ -136,38 +141,132 @@ function create() {
   muteButton.on('pointerdown', () => {
     muteButton.setVisible(false);
     soundButton.setVisible(true);
-    this.sound.play('button');
-    // this.bgm.pause();
-    // 모든 사운드 볼륨 0으로 설정
+    this.buttonSound.play();
     if (this.bgm) this.bgm.setVolume(0);
     if (this.bossBgm) this.bossBgm.setVolume(0);
     if (this.coinSound) this.coinSound.setVolume(0);
     if (this.hitSound) this.hitSound.setVolume(0);
     if (this.explosionSound) this.explosionSound.setVolume(0);
-    if (this.sound && typeof this.sound.get === 'function') {
-      const buttonSound = this.sound.get('button');
-      if (buttonSound) buttonSound.setVolume(0);
-    }
   });
 
   soundButton.setInteractive({ useHandCursor: true });
   soundButton.on('pointerdown', () => {
     soundButton.setVisible(false);
     muteButton.setVisible(true);
-    this.sound.play('button');
+    this.buttonSound.play();
     if (this.bgm) this.bgm.setVolume(0.5);
     if (this.bossBgm) this.bossBgm.setVolume(0.5);
     if (this.coinSound) this.coinSound.setVolume(1);
     if (this.hitSound) this.hitSound.setVolume(1);
     if (this.explosionSound) this.explosionSound.setVolume(1);
-    if (this.sound && typeof this.sound.get === 'function') {
-      const buttonSound = this.sound.get('button');
-      if (buttonSound) buttonSound.setVolume(1);
-    }
   });
 }
 
-// 게임 방법 팝업
+async function update() {
+  if (!gameStarted || isPaused) return;
+
+  if (this.helpers) { 
+    this.helpers.children.iterate(helper => {
+      if (helper && helper.active && (helper.texture.key === 'helper1' || helper.texture.key === 'helper2')) { 
+        helper.x += Math.sin(Date.now() / 500 + helper.y / 100) * 0.5;
+        helper.y += 2;
+      }
+    });
+  }
+
+  let boss = null;
+  if (this.enemies) { 
+    this.enemies.children.iterate(enemy => {
+      if (enemy && enemy.active && enemy.enemyType === 'enemy3' && !enemy.isHit) { // enemy3 좌우 진동 이동
+        enemy.x += Math.sin(Date.now() / 600 + enemy.y / 100) * 0.8;
+      }
+      // 보스 객체 찾기
+      if (enemy && enemy.active && enemy.enemyType === 'boss1') {
+        boss = enemy;
+      }
+    });
+  }
+
+  if (scoreText) scoreText.setText(score);
+  if (distanceText) { // 보스가 없을 때만 distance 증가
+    let bossExists = false;
+    if (this.enemies) {
+      this.enemies.children.iterate(enemy => {
+        if (enemy && enemy.active && enemy.enemyType === 'boss1') bossExists = true;
+      });
+    }
+    if (!bossExists) distance += 1;
+    distanceText.setText(`${ Math.floor(distance / 10) } m`);
+
+    // 보스 등장 (한 번만 등장)
+    if (distance === 500 && !bossAppeared) {
+      if (this.bossBgm && muteButton.visible) {
+        this.bgm.stop();
+        this.bossBgm.play();
+      }
+      bossAppeared = true;
+      const boss = this.enemies.create(this.scale.width / 2, -100, 'boss1');
+      boss.enemyType = 'boss1';
+      boss.setVelocityY(60);
+      boss.setScale(0.4);
+      boss.body.setSize(boss.width * 0.6, boss.height * 0.6);
+      boss.hitCount = 0;
+
+      // 0.5초 후에 기존 적들 제거
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const toRemove = [];
+      this.enemies.children.iterate(enemy => (enemy && enemy.active && (enemy.enemyType !== 'boss1')) && toRemove.push(enemy));
+      toRemove.forEach(enemy => {
+        this.tweens.add({
+          targets: enemy,
+          alpha: 0,
+          scale: 0,
+          duration: 400,
+          onComplete: () => enemy.disableBody(true, true)
+        });
+      });
+    }
+  }
+
+  // 배경 스크롤 (보스 등장 시 멈춤)
+  if (!boss) {
+    backgroundImg.tilePositionY -= 2;
+  }
+
+  // 플레이어 이동
+  if (this.cursors.left.isDown) {
+    player.x -= 5;
+    playerShake = 3;
+  } else if (this.cursors.right.isDown) {
+    player.x += 5;
+    playerShake = 3;
+  } else {
+    playerShake = Math.max(playerShake - 1, 0);
+  }
+
+  // 보스 좌우 이동 및 y축 고정 (가운데 기준)
+  if (boss) {
+    const bossTargetY = 150;
+    const centerX = this.scale.width / 2;
+    // 내려오면서 동시에 좌우 이동
+    boss.x = centerX + Math.sin(Date.now() / 1200) * 120;
+    if (boss.y < bossTargetY) {
+      boss.setVelocityY(60);
+    } else {
+      boss.y = bossTargetY;
+      boss.setVelocityY(0);
+    }
+  }
+
+  // 플레이어 흔들림 효과 적용
+  if (playerShake > 0) {
+    player.y += Math.sin(Date.now() / 40) * 2;
+  } else {
+    player.y = this.scale.height - 80;
+  }
+}
+
+// ------------------------------------------------------------------------------------------ 추가 함수들
 function showHowToPopup() {
   // 팝업 배경
   const popupBg = this.add.graphics().setDepth(10);
@@ -199,87 +298,16 @@ function showHowToPopup() {
     popupBg.destroy();
     popupText.destroy();
     closeBtn.destroy();
-    this.sound.play('button');
+    this.buttonSound.play();
   });
 }
 
-function startGame() {
-  this.helpers = this.physics.add.group();
-  this.enemies = this.physics.add.group();
-
-  // 게임 시작/정지
-  pauseButton = this.add.image(this.scale.width - 20, 20, 'pauseButton').setVisible(true).setScale(0.5).setDepth(2);
-  playButton = this.add.image(this.scale.width - 20, 20, 'playButton').setVisible(false).setScale(0.5).setDepth(2);
-
-  pauseButton.setInteractive({ useHandCursor: true });
-  pauseButton.on('pointerdown', () => {
-    isPaused = true;
-    this.sound.play('button');
-    pauseButton.setVisible(false);
-    playButton.setVisible(true);
-    this.bgm.pause();
-    this.bossBgm.pause();
-    this.enemies.setVelocityY(0);
-    this.helpers.setVelocityY(0);
-  });
-
-  playButton.setInteractive({ useHandCursor: true });
-  playButton.on('pointerdown', () => {
-    isPaused = false;
-    this.sound.play('button');
-    playButton.setVisible(false);
-    pauseButton.setVisible(true);
-    if (muteButton.visible) {
-      this.bgm.resume();
-      this.bossBgm.resume();
-    }
-    this.enemies.setVelocityY(100);
-    this.helpers.setVelocityY(100);
-  });
-
-  // 타이틀과 버튼 제거
-  titleText.destroy();
-  startButton.destroy();
-  gameStarted = true;
-
-  backgroundImg = this.add.tileSprite(0, 0, this.scale.width, this.scale.height, 'background').setOrigin(0);  // 배경 추가
-
-  // ------------------------------------------------------------------------------------------ 플레이어 생성
-  player = this.physics.add.sprite(this.scale.width / 2, this.scale.height - 80, 'player'); // 플레이어 추가
-  player.setCollideWorldBounds(true);
-  player.setScale(0.2);
-  player.body.setSize(player.width * 0.5, player.height * 0.8);
-
-  this.playerBullets = this.physics.add.group(); // 플레이어 총알 그룹
-  this.time.addEvent({ // 플레이어가 총알 발사
-    delay: 200, 
-    callback: () => {
-      if (!gameStarted || isPaused || isPlayerDead) return;
-      if (player.isDouble) { // 두발 발사
-        const bullet1 = this.playerBullets.create(player.x - 10, player.y - 20, 'player_bullet');
-        const bullet2 = this.playerBullets.create(player.x + 10, player.y - 20, 'player_bullet');
-        bullet1.body.setSize(bullet1.width * 0.5, bullet1.height * 0.5);
-        bullet2.body.setSize(bullet2.width * 0.5, bullet2.height * 0.5);
-        bullet1.setVelocityY(-300);
-        bullet1.setScale(0.08);
-        bullet2.setVelocityY(-300);
-        bullet2.setScale(0.08);
-      } else { // 한발만 발사
-        const bullet = this.playerBullets.create(player.x, player.y - 20, 'player_bullet');
-        bullet.setVelocityY(-300);
-        bullet.setScale(0.08);
-        bullet.body.setSize(bullet.width * 0.5, bullet.height * 0.5);
-      }
-    },
-    loop: true
-  });
-
-  // ------------------------------------------------------------------------------------------ 적 생성
+function initEnemySpawns() {
   // enemy1 생성
   this.time.addEvent({
     delay: 2000,
     callback: () => {
-      if (!gameStarted || isPaused || isPlayerDead || this.bossAppeared) return;
+      if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
       const x = Phaser.Math.Between(50, this.scale.width - 50);
       const enemy = this.enemies.create(x, -50, 'enemy1');
       enemy.enemyType = 'enemy1';
@@ -295,7 +323,7 @@ function startGame() {
   this.time.addEvent({
     delay: 3000,
     callback: () => {
-      if (!gameStarted || isPaused || isPlayerDead || this.bossAppeared) return;
+      if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
       const x = Phaser.Math.Between(50, this.scale.width - 50);
       const enemy = this.enemies.create(x, -50, 'enemy2');
       enemy.enemyType = 'enemy2';
@@ -317,7 +345,7 @@ function startGame() {
   this.time.addEvent({
     delay: 5000,
     callback: () => {
-      if (!gameStarted || isPaused || isPlayerDead || this.bossAppeared) return;
+      if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
       const x = Phaser.Math.Between(50, this.scale.width - 50);
       const enemy = this.enemies.create(x, -50, 'enemy3');
       enemy.enemyType = 'enemy3';
@@ -330,8 +358,70 @@ function startGame() {
     },
     loop: true
   });
+}
 
-  // ------------------------------------------------------------------------------------------ 충돌
+function initGameUI() {
+  // 점수
+  score = 0;
+  const scoreDim = this.add.graphics().setDepth(19);
+  scoreDim.fillStyle(0xffffff, 0.6);
+  scoreDim.fillRoundedRect(6, 8, 120, 32, 10);
+  this.add.image(40, 25, 'helper3').setScale(0.13).setDepth(20);
+  scoreText = this.add.text(70, 13, '0', {
+    fontFamily: 'PFStardustS',
+    fontSize: '26px',
+    fontStyle: 'bold',
+    fill: '#222',
+    stroke: '#fff',
+    strokeThickness: 4
+  }).setOrigin(0, 0).setDepth(20);
+
+  // 거리
+  distance = 0;
+  const distanceDim = this.add.graphics().setDepth(19);
+  distanceDim.fillStyle(0xffffff, 0.6);
+  distanceDim.fillRoundedRect(6, 48, 120, 32, 10);
+  distanceText = this.add.text(70, 53, '0 m', {
+    fontFamily: 'PFStardustS',
+    fontSize: '26px',
+    fontStyle: 'bold',
+    fill: '#222',
+    stroke: '#fff',
+    strokeThickness: 4
+  }).setOrigin(0.5, 0).setDepth(20);
+
+  // 무전기(시도 횟수)
+  tryCount = 3;
+  const tryDim = this.add.graphics().setDepth(19);
+  tryDim.fillStyle(0xffffff, 0.6);
+  tryDim.fillRoundedRect(6, this.scale.height - 35, 70, 32, 10);
+  this.add.image(20, this.scale.height - 20, 'walkie').setScale(0.3).setDepth(20);
+  tryText = this.add.text(35, this.scale.height - 25, tryCount, {
+    fontFamily: 'PFStardustS',
+    fontSize: '24px',
+    fontStyle: 'bold',
+    fill: '#222',
+    stroke: '#fff',
+    strokeThickness: 4
+  }).setOrigin(0, 0).setDepth(20);
+
+  // 수리공구
+  repairCount = 0;
+  const repairDim = this.add.graphics().setDepth(19);
+  repairDim.fillStyle(0xffffff, 0.6);
+  repairDim.fillRoundedRect(80, this.scale.height - 35, 70, 32, 10);
+  this.add.image(100, this.scale.height - 20, 'repair').setScale(0.3).setDepth(20);
+  repairText = this.add.text(120, this.scale.height - 25, repairCount, {
+    fontFamily: 'PFStardustS',
+    fontSize: '24px',
+    fontStyle: 'bold',
+    fill: '#222',
+    stroke: '#fff',
+    strokeThickness: 4
+  }).setOrigin(0, 0).setDepth(20);
+}
+
+function initCollisions () {
   // player vs helper
   this.physics.add.overlap(player, this.helpers, (playerObj, helperObj) => {
     helperObj.destroy();
@@ -397,7 +487,7 @@ function startGame() {
 
   }, null, this);
 
-  // bullet vs enemy
+  // player bullet vs enemy
   this.physics.add.overlap(this.playerBullets, this.enemies, (bullet, enemy) => {
     bullet.destroy();
     this.hitSound.play();
@@ -407,7 +497,7 @@ function startGame() {
     
     if (enemy.enemyType === 'enemy1') { // 선인장
       if (enemy.hitCount === 1) {
-        enemy.setTexture('enemy1_ice');
+        enemy.setTexture('enemy1Ice');
       } else {
         const helper = this.helpers.create(enemy.x, enemy.y, 'helper3');
         helper.setScale(0.13);
@@ -450,7 +540,6 @@ function startGame() {
       // 7대 맞으면 boss5로 변경
       else if (enemy.hitCount === 20) {
         enemy.setTexture('boss5');
-        bossAppeared = false; // 보스 퇴장
         if (this.explosionSound && muteButton.visible) {
           this.explosionSound.play();
         }
@@ -462,184 +551,162 @@ function startGame() {
             alpha: 0,
             scale: 0,
             duration: 400,
-            onComplete: () => enemy.destroy()
+            onComplete: () => {
+              enemy.destroy();
+
+              // helper3개를 흩뿌리기
+              for (let i = 0; i < 3; i++) {
+                const offsetX = Phaser.Math.Between(-50, 50);
+                const offsetY = Phaser.Math.Between(-50, 50);
+                const helper = this.helpers.create(enemy.x + offsetX, enemy.y + offsetY, 'helper3');
+                helper.setScale(0.13);
+                helper.setVelocity(Phaser.Math.Between(-30, 30), Phaser.Math.Between(30, 60));
+              }
+
+              // bossAppeared = false;
+              // if (this.bossBgm && muteButton.visible) {
+              //   this.bossBgm.stop();
+              //   this.bgm.play();
+              // }
+            }
           });
-          if (this.bossBgm && muteButton.visible) {
-            this.bossBgm.stop();
-            this.bgm.play();
-          }
         });
       }
     }
   }, null, this);
 
-  // ------------------------------------------------------------------------------------------ 부가요소
-  // 점수
-  score = 0;
-  const scoreDim = this.add.graphics().setDepth(19);
-  scoreDim.fillStyle(0xffffff, 0.6);
-  scoreDim.fillRoundedRect(6, 8, 120, 32, 10);
-  this.add.image(40, 25, 'helper3').setScale(0.13).setDepth(20);
-  scoreText = this.add.text(70, 13, '0', {
-    fontFamily: 'PFStardustS',
-    fontSize: '26px',
-    fontStyle: 'bold',
-    fill: '#222',
-    stroke: '#fff',
-    strokeThickness: 4
-  }).setOrigin(0, 0).setDepth(20);
-
-  // 거리
-  distance = 0;
-  const distanceDim = this.add.graphics().setDepth(19);
-  distanceDim.fillStyle(0xffffff, 0.6);
-  distanceDim.fillRoundedRect(6, 48, 120, 32, 10);
-  distanceText = this.add.text(70, 53, '0 m', {
-    fontFamily: 'PFStardustS',
-    fontSize: '26px',
-    fontStyle: 'bold',
-    fill: '#222',
-    stroke: '#fff',
-    strokeThickness: 4
-  }).setOrigin(0.5, 0).setDepth(20);
-
-  // 무전기(시도 횟수)
-  tryCount = 3;
-  const tryDim = this.add.graphics().setDepth(19);
-  tryDim.fillStyle(0xffffff, 0.6);
-  tryDim.fillRoundedRect(6, this.scale.height - 35, 70, 32, 10);
-  this.add.image(20, this.scale.height - 20, 'walkie').setScale(0.3).setDepth(20);
-  tryText = this.add.text(35, this.scale.height - 25, tryCount, {
-    fontFamily: 'PFStardustS',
-    fontSize: '24px',
-    fontStyle: 'bold',
-    fill: '#222',
-    stroke: '#fff',
-    strokeThickness: 4
-  }).setOrigin(0, 0).setDepth(20);
-
-  // 수리공구
-  repairCount = 0;
-  const repairDim = this.add.graphics().setDepth(19);
-  repairDim.fillStyle(0xffffff, 0.6);
-  repairDim.fillRoundedRect(80, this.scale.height - 35, 70, 32, 10);
-  this.add.image(100, this.scale.height - 20, 'repair').setScale(0.3).setDepth(20);
-  repairText = this.add.text(120, this.scale.height - 25, repairCount, {
-    fontFamily: 'PFStardustS',
-    fontSize: '24px',
-    fontStyle: 'bold',
-    fill: '#222',
-    stroke: '#fff',
-    strokeThickness: 4
-  }).setOrigin(0, 0).setDepth(20);
-  
-  // ------------------------------------------------------------------------------------------ 키 설정
-  // 키 입력
-  this.cursors = this.input.keyboard.createCursorKeys();
+  // enemy bullet vs player
+  this.physics.add.overlap(player, this.bossBullets, (playerObj, bullet) => {
+    bullet.destroy();
+    // 플레이어가 보호막 없으면 죽음 처리
+    if (!playerObj.isProtected && !isPlayerDead) {
+      playerObj.setTexture('playerCrash');
+      gameStarted = false;
+      this.bgm.stop();
+      this.bossBgm.stop();
+      this.enemies.setVelocityY(0);
+      this.helpers.setVelocityY(0);
+      tryCount--;
+      if (tryText) tryText.setText(tryCount);
+      isPlayerDead = true;
+    } else if (playerObj.isProtected) {
+      playerObj.setTexture('player');
+      playerObj.isProtected = false;
+    }
+  }, null, this);
 }
 
-async function update() {
-  if (!gameStarted || isPaused) return;
-
-  if (this.helpers) { 
-    this.helpers.children.iterate(helper => {
-      if (helper && helper.active && (helper.texture.key === 'helper1' || helper.texture.key === 'helper2')) { 
-        helper.x += Math.sin(Date.now() / 500 + helper.y / 100) * 0.5;
-        helper.y += 2;
+function initPlayerShooting() {
+  this.playerBullets = this.physics.add.group(); // 플레이어 총알 그룹
+  this.time.addEvent({ // 플레이어가 총알 발사
+    delay: 200, 
+    callback: () => {
+      if (!gameStarted || isPaused || isPlayerDead) return;
+      if (player.isDouble) { // 두발 발사
+        const bullet1 = this.playerBullets.create(player.x - 10, player.y - 20, 'playerBullet');
+        const bullet2 = this.playerBullets.create(player.x + 10, player.y - 20, 'playerBullet');
+        bullet1.body.setSize(bullet1.width * 0.5, bullet1.height * 0.5);
+        bullet2.body.setSize(bullet2.width * 0.5, bullet2.height * 0.5);
+        bullet1.setVelocityY(-300);
+        bullet1.setScale(0.08);
+        bullet2.setVelocityY(-300);
+        bullet2.setScale(0.08);
+      } else { // 한발만 발사
+        const bullet = this.playerBullets.create(player.x, player.y - 20, 'playerBullet');
+        bullet.setVelocityY(-300);
+        bullet.setScale(0.08);
+        bullet.body.setSize(bullet.width * 0.5, bullet.height * 0.5);
       }
-    });
-  }
-
-  let boss = null;
-  if (this.enemies) { 
-    this.enemies.children.iterate(enemy => {
-      if (enemy && enemy.active && enemy.enemyType === 'enemy3' && !enemy.isHit) { // enemy3 좌우 진동 이동
-        enemy.x += Math.sin(Date.now() / 600 + enemy.y / 100) * 0.8;
-      }
-      // 보스 객체 찾기
-      if (enemy && enemy.active && enemy.enemyType === 'boss1') {
-        boss = enemy;
-      }
-    });
-  }
-
-  if (scoreText) scoreText.setText(score);
-  if (distanceText) { // 보스가 없을 때만 distance 증가
-      let bossExists = false;
-      if (this.enemies) {
-        this.enemies.children.iterate(enemy => {
-          if (enemy && enemy.active && enemy.enemyType === 'boss1') bossExists = true;
-        });
-      }
-      if (!bossExists) distance += 1;
-      distanceText.setText(`${ Math.floor(distance / 10) } m`);
-
-    // 보스 등장 (한 번만 등장)
-    if (distance === 500 && !this.bossAppeared) {
-      if (this.bossBgm && muteButton.visible) {
-        this.bgm.stop();
-        this.bossBgm.play();
-      }
-      this.bossAppeared = true;
-      const boss = this.enemies.create(this.scale.width / 2, -100, 'boss1');
-      boss.enemyType = 'boss1';
-      boss.setVelocityY(60);
-      boss.setScale(0.4);
-      boss.body.setSize(boss.width * 0.6, boss.height * 0.6);
-      boss.hitCount = 0;
-
-      // 0.5초 후에 기존 적들 제거
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const toRemove = [];
-      this.enemies.children.iterate(enemy => (enemy && enemy.active && (enemy.enemyType !== 'boss1')) && toRemove.push(enemy));
-      toRemove.forEach(enemy => {
-        this.tweens.add({
-          targets: enemy,
-          alpha: 0,
-          scale: 0,
-          duration: 400,
-          onComplete: () => enemy.disableBody(true, true)
-        });
-      });
-    }
-  }
-
-  // 배경 스크롤 (보스 등장 시 멈춤)
-  if (!boss) {
-    backgroundImg.tilePositionY -= 2;
-  }
-
-  // 플레이어 이동
-  if (this.cursors.left.isDown) {
-    player.x -= 5;
-    playerShake = 3;
-  } else if (this.cursors.right.isDown) {
-    player.x += 5;
-    playerShake = 3;
-  } else {
-    playerShake = Math.max(playerShake - 1, 0);
-  }
-
-  // 보스 좌우 이동 및 y축 고정 (가운데 기준)
-  if (boss) {
-    const bossTargetY = 150;
-    const centerX = this.scale.width / 2;
-    // 내려오면서 동시에 좌우 이동
-    boss.x = centerX + Math.sin(Date.now() / 1200) * 120;
-    if (boss.y < bossTargetY) {
-      boss.setVelocityY(60);
-    } else {
-      boss.y = bossTargetY;
-      boss.setVelocityY(0);
-    }
-  }
-
-  // 플레이어 흔들림 효과 적용
-  if (playerShake > 0) {
-    player.y += Math.sin(Date.now() / 40) * 2;
-  } else {
-    player.y = this.scale.height - 80;
-  }
+    },
+    loop: true
+  });
 }
 
+function initBossShooting() {
+  this.bossBullets = this.physics.add.group(); // 보스 총알 그룹
+
+  this.time.addEvent({ // 보스가 총알 발사
+    delay: 4000,
+    callback: () => {
+      // 보스가 등장 중일 때만 발사
+      const boss = this.enemies.getChildren().find(e => e.enemyType === 'boss1' && e.active);
+      if (boss && player && bossAppeared && gameStarted && !isPaused && !isPlayerDead) {
+        // 플레이어 방향 벡터 계산
+        const bulletPatterns = [
+          () => {
+            for (let i = 0; i < 3; i++) {
+              const bullet = this.bossBullets.create(boss.x, boss.y + 40, 'enemyBullet');
+              bullet.setScale(0.2);
+              bullet.setVelocity((i - 1) * 50, 220); // -50, 0, 50
+              bullet.setDepth(10);
+              bullet.body.setSize(bullet.width * 0.7, bullet.height * 0.7);
+            }
+          }
+        ];
+
+        const patternIndex = Phaser.Math.Between(0, bulletPatterns.length - 1);
+        bulletPatterns[patternIndex]();
+        this.enemyBulletSound.play();
+      }
+    },
+    loop: true
+  });
+}
+
+function startGame() {
+  this.helpers = this.physics.add.group();
+  this.enemies = this.physics.add.group();
+  gameStarted = true;
+
+  // 게임 시작/정지
+  pauseButton = this.add.image(this.scale.width - 20, 20, 'pauseButton').setVisible(true).setScale(0.5).setDepth(2);
+  playButton = this.add.image(this.scale.width - 20, 20, 'playButton').setVisible(false).setScale(0.5).setDepth(2);
+
+  pauseButton.setInteractive({ useHandCursor: true });
+  pauseButton.on('pointerdown', () => {
+    isPaused = true;
+    this.buttonSound.play();
+    pauseButton.setVisible(false);
+    playButton.setVisible(true);
+    this.bgm.pause();
+    this.bossBgm.pause();
+    this.enemies.setVelocityY(0);
+    this.helpers.setVelocityY(0);
+  });
+
+  playButton.setInteractive({ useHandCursor: true });
+  playButton.on('pointerdown', () => {
+    isPaused = false;
+    this.buttonSound.play();
+    playButton.setVisible(false);
+    pauseButton.setVisible(true);
+    if (muteButton.visible) {
+      this.bgm.resume();
+      this.bossBgm.resume();
+    }
+    this.enemies.setVelocityY(100);
+    this.helpers.setVelocityY(100);
+  });
+
+  // 타이틀과 버튼 제거
+  titleText.destroy();
+  startButton.destroy();
+  backgroundImg = this.add.tileSprite(0, 0, this.scale.width, this.scale.height, 'background').setOrigin(0);  // 배경 추가
+
+  // ------------------------------------------------------------------------------------------ 플레이어 생성
+  player = this.physics.add.sprite(this.scale.width / 2, this.scale.height - 80, 'player'); // 플레이어 추가
+  player.setCollideWorldBounds(true);
+  player.setScale(0.2);
+  player.body.setSize(player.width * 0.5, player.height * 0.8);
+
+  // ------------------------------------------------------------------------------------------ 초기화 함수들
+  initPlayerShooting.call(this); // 플레이어 총알 초기화
+  initBossShooting.call(this); // 보스 총알 초기화
+  initEnemySpawns.call(this); // 적 생성 초기화
+  initCollisions.call(this); // 충돌 처리 초기화
+  initGameUI.call(this); // 부가요소 초기화
+  this.cursors = this.input.keyboard.createCursorKeys(); // 키 입력
+}
+
+// ------------------------------------------------------------------------------------------ 게임 실행
 window.onload = () => 	game = new Phaser.Game(config);
