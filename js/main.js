@@ -65,6 +65,8 @@ function preload() {
   // 사운드
   this.load.audio('bgm', 'assets/sounds/bgm.mp3');
   this.load.audio('bossBgm', 'assets/sounds/boss_bgm.mp3');
+  this.load.audio('coinBgm', 'assets/sounds/coin_bgm.mp3');
+  this.load.audio('nextBgm', 'assets/sounds/next_bgm.mp3');
   this.load.audio('buttonSound', 'assets/sounds/button.mp3');
   this.load.audio('coinSound', 'assets/sounds/coin.mp3');
   this.load.audio('hitSound', 'assets/sounds/hit.mp3');
@@ -75,6 +77,8 @@ function preload() {
 function create() {
   this.bgm = this.sound.add('bgm', { loop: true, volume: 0.5 });
   this.bossBgm = this.sound.add('bossBgm', { loop: true, volume: 0.5 });
+  this.coinBgm = this.sound.add('coinBgm', { loop: true, volume: 0.5 });
+  this.nextBgm = this.sound.add('nextBgm', { volume: 0.5 });
   this.buttonSound = this.sound.add('buttonSound');
   this.coinSound = this.sound.add('coinSound');
   this.hitSound = this.sound.add('hitSound');
@@ -199,7 +203,7 @@ async function update() {
     distanceText.setText(`${ Math.floor(distance / 10) } m`);
 
     // 보스 등장 (한 번만 등장)
-    if (distance === 500 && !bossAppeared) {
+    if (distance === 1000 && !bossAppeared) {
       if (this.bossBgm && muteButton.visible) {
         this.bgm.stop();
         this.bossBgm.play();
@@ -483,6 +487,13 @@ function initCollisions () {
       tryCount--;
       if (tryText) tryText.setText(tryCount);
       isPlayerDead = true;
+
+      // html에 있는 js-quizBox 보여주기
+      const quizBox = document.querySelector('.js-quizBox');
+      quizBox.classList.add('on');
+      // 캔버스에는 disable 클래스 추가
+      const gameCanvas = document.querySelector('canvas');
+      gameCanvas.classList.add('disabled');
     }
 
   }, null, this);
@@ -553,21 +564,29 @@ function initCollisions () {
             duration: 400,
             onComplete: () => {
               enemy.destroy();
-
-              // helper3개를 흩뿌리기
-              for (let i = 0; i < 3; i++) {
-                const offsetX = Phaser.Math.Between(-50, 50);
-                const offsetY = Phaser.Math.Between(-50, 50);
-                const helper = this.helpers.create(enemy.x + offsetX, enemy.y + offsetY, 'helper3');
-                helper.setScale(0.13);
-                helper.setVelocity(Phaser.Math.Between(-30, 30), Phaser.Math.Between(30, 60));
+              if (this.bossBgm && muteButton.visible) {
+                this.bossBgm.stop();
+                this.coinBgm.play();
               }
 
-              // bossAppeared = false;
-              // if (this.bossBgm && muteButton.visible) {
-              //   this.bossBgm.stop();
-              //   this.bgm.play();
-              // }
+              for (let row = 0; row < 9; row++) {
+                for (let col = 0; col < 5; col++) {
+                  const offsetX = (col - 2) * 40;
+                  const offsetY = (row - 4) * 40;
+                  const helper = this.helpers.create(this.scale.width / 2 + offsetX, enemy.y + offsetY, 'helper3');
+                  helper.setScale(0.13);
+                  helper.setVelocityY(100);
+                }
+              }
+
+              this.time.delayedCall(7000, () => {
+                // 게임 정지
+                gameStarted = false;
+                console.log("넥스트~레벨~");
+                this.coinBgm.stop();
+                this.nextBgm.play();
+                // bossAppeared = false;
+              });
             }
           });
         });

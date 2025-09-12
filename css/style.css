@@ -13,8 +13,111 @@ body {
   height: 100vh;
 }
 
+button {
+  cursor: pointer;
+  font-family: 'PFStardustS';
+  font-size: 1.5rem;
+  font-weight: bold;
+  padding: 10px 20px;
+  border: 4px dashed #333;
+}
+
+button:hover {
+  background: #333;
+  color: #fff;
+  border: 4px dashed #fff;
+}
+
 canvas {
   display: block;
   margin: 0 auto;
   box-shadow: 0 0 20px #333;
+}
+
+canvas.disabled {
+  pointer-events: none;
+  opacity: 0.2;
+}
+
+/* 퀴즈 */
+.quizBox {
+  display: none;
+  width: calc(500px / 1.5);
+  height: calc(500px / 1.5);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  background: url('../assets/images/quiz_box.png') no-repeat center / cover;
+  animation: show 1.5s ease forwards;
+}
+
+.quizBox.on {
+  display: block;
+}
+
+.alert {
+  width: 500px;
+  height: 500px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: url('../assets/images/quiz_container.png') no-repeat center / contain;
+  z-index: 10;
+
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-family: 'PFStardustS';
+  font-size: 2rem;
+  text-align: center;
+}
+
+.alert.on {
+  display: flex;
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #333;
+  background: rgb(255, 255, 95);
+  padding: 10px 20px;
+  width: calc(100% - 188px);
+
+  position: absolute;
+  top: 8px;
+  left: 50px;
+}
+
+.content {
+  line-height: 1.2;
+}
+
+.highlight {
+  color: #d63447;
+  font-weight: bold;
+}
+
+.walkie {
+  display: inline-block;
+  width: 60px;
+  height: 60px;
+  background: url('../assets/images/walkie.png') no-repeat center / contain;
+  cursor: pointer;
+  z-index: 10;
+}
+
+@keyframes show {
+  0% {
+    top: -100%;
+    opacity: 0;
+  }
+  100% {
+    top: 50%;
+    opacity: 1;
+  }
 }
