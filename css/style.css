@@ -13,6 +13,17 @@ body {
   height: 100vh;
 }
 
+input {
+  font-family: 'PFStardustS';
+  font-size: 1.8rem;
+  font-weight: bold;
+  padding: 10px;
+  outline: none;
+  border: 2px solid #333;
+  border-radius: 5px;
+  text-align: center;
+}
+
 button {
   cursor: pointer;
   font-family: 'PFStardustS';
@@ -40,6 +51,15 @@ canvas.disabled {
 }
 
 /* 퀴즈 */
+.content {
+  line-height: 1.2;
+}
+
+.highlight {
+  color: #d63447;
+  font-weight: bold;
+}
+
 .quizBox {
   display: none;
   width: calc(500px / 1.5);
@@ -93,13 +113,80 @@ canvas.disabled {
   left: 50px;
 }
 
-.content {
-  line-height: 1.2;
+.title .crash,
+.title .wrong {
+  display: none;
 }
 
-.highlight {
-  color: #d63447;
+[data-type="crash"] .title .crash {
+  display: inline;
+}
+
+[data-type="wrong"] .title .wrong {
+  display: inline;
+}
+
+.quizContainer {
+  width: 500px;
+  height: 500px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: url('../assets/images/quiz_container.png') no-repeat center / contain;
+  z-index: 10;
+
+  display: none;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  gap: 30px;
+}
+
+.quizContainer.on {
+  display: flex;
+}
+
+.quizContent {
+  width: calc(100% - 100px);
+  height: calc(100% - 120px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 30px;
+  font-family: 'PFStardustS';
+  font-size: 2.5rem;
+}
+
+.question {
+  font-size: 1.8rem;
   font-weight: bold;
+  color: #333;
+  line-height: 1.4;
+  text-align: center;
+
+  width: calc(100% - 100px);
+  height: 120px;
+  position: absolute;
+  top: 80px;
+}
+
+.answerBox {
+  width: calc(100% - 200px);
+  height: 60px;
+
+  position: absolute;
+  bottom: 180px;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.submitBtn {
+  position: absolute;
+  bottom: 60px;
 }
 
 .walkie {
@@ -120,4 +207,40 @@ canvas.disabled {
     top: 50%;
     opacity: 1;
   }
+}
+
+/* 오답팝업 */
+.wrongPopup {
+  width: 400px;
+  height: 200px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: url('../assets/images/score_box.png') no-repeat center / contain;
+  z-index: 20;
+
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.wrongPopup.on {
+  display: flex;
+}
+
+.scoreText {
+  font-family: 'PFStardustS';
+  font-size: 3rem;
+  font-weight: bold;
+  color: #fff;
+
+  position: absolute;
+  bottom: -6px;
+}
+
+.restartBtn {
+  position: absolute;
+  bottom: -60px;
 }

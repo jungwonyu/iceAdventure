@@ -12,18 +12,39 @@
 
 <body>
   <div class="js-quizBox quizBox"></div>
-  <div class="js-alert alert">
-    <p class="title"><span id="count">1</span>번째 충돌!</p>
+
+  <!-- 퀴즈 알럿 -->
+  <div class="js-alert alert" data-type="">
+    <p class="title">
+      <span class="js-crash crash"><span class="js-count"></span>번째 충돌!</span>
+      <span class="js-wrong wrong">오답입니다!</span>
+    </p>
     <p class="content">
-      <span class="highlight"><span class="walkie"></span><span id="count">1</span>개</span>를 사용해<br>
+      <span class="highlight"><span class="walkie"></span><span class="js-count"></span>개</span>를 사용해<br>
       <span class="highlight">긴급 수리</span>를 요청할 수 있어요!
     </p>
     <div class="btnArea">
       <button class="js-requestBtn requestBtn">요청하기</button>
-      <button class="js-closeBtn closeBtn">끝내기</button>
+      <button class="js-endBtn endBtn">끝내기</button>
     </div>
   </div>
-  <div class="js-quizContainer quizContainer"></div>
+
+  <!-- 퀴즈 컨테이너 -->
+  <div class="js-quizContainer quizContainer">
+    <div class="quizContent">
+      <p class="js-question question"></p>
+      <div class="answerBox">
+        <input type="text" class="js-answer" data-answer="" placeholder="정답 입력" />
+      </div>
+    </div>
+    <button class="js-submitBtn submitBtn">제출하기</button>
+  </div>
+
+  <!-- 오답 팝업 -->
+  <div class="js-wrongPopup wrongPopup">
+    <p class="scoreText"><span class="js-score score">100</span></p>
+    <button class="js-restartBtn restartBtn">처음으로</button>
+  </div>
 </body>
 
 <script src="js/config.js"></script>

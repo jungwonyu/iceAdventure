@@ -1,3 +1,5 @@
+const ACT_ON = 'on';
+
 let game;
 let isPlayerDead = false;
 let player;
@@ -18,12 +20,47 @@ let pauseButton;
 let distance = 0;
 let distanceText;
 let bossAppeared = false;
+let gameOver = 0;
+let quizData = [];
+let gameOverCount = 0;
+let level = 1;
+let isTouching = false;
+
+const alertBox = document.querySelector('.js-alert');
+const quizBox = document.querySelector('.js-quizBox');
+const quizContainer = document.querySelector('.js-quizContainer');
+const restartBtn = document.querySelector('.js-restartBtn');
+const requestBtn = document.querySelector('.js-requestBtn');
+const endBtn = document.querySelector('.js-endBtn');
+const counts = document.querySelectorAll('.js-count');
+
+const question = document.querySelector('.js-question');
+const answer = document.querySelector('.js-answer');
+const submitBtn = document.querySelector('.js-submitBtn');
+
+const wrongPopup = document.querySelector('.js-wrongPopup');
+const userScore = document.querySelector('.js-score');
+
+const levelConfig = {
+  1: { bossDistance: 800, bulletCount: 3, speed: 1 },
+  2: { bossDistance: 1500, bulletCount: 4, speed: 1.2 },
+  3: { bossDistance: 2000, bulletCount: 5, speed: 1.5 },
+  4: { bossDistance: 3000, bulletCount: 5, speed: 1.8 },
+  5: { bossDistance: 4500, bulletCount: 6, speed: 2 },
+  6: { bossDistance: 6000, bulletCount: 6, speed: 2.2 },
+  7: { bossDistance: 8000, bulletCount: 7, speed: 2.5 },
+  8: { bossDistance: 10000, bulletCount: 7, speed: 2.8 },
+  9: { bossDistance: 13000, bulletCount: 8, speed: 3 },
+  10: { bossDistance: 16000, bulletCount: 8, speed: 3.2 }
+}
 
 // ------------------------------------------------------------------------------------------ 기본 함수들
 function preload() {
 	// 배경
   this.load.image('startBackground', 'assets/images/start_background.png');
 	this.load.image('background', 'assets/images/background.png');
+	this.load.image('background2', 'assets/images/background2.png');
+	this.load.image('background3', 'assets/images/background3.png');
 
   // 플레이어
   this.load.image('player', 'assets/images/player.png');
@@ -72,6 +109,18 @@ function preload() {
   this.load.audio('hitSound', 'assets/sounds/hit.mp3');
   this.load.audio('explosionSound', 'assets/sounds/explosion.mp3');
   this.load.audio('enemyBulletSound', 'assets/sounds/enemy_bullet.mp3');
+  this.load.audio('correctSound', 'assets/sounds/correct.mp3');
+  this.load.audio('countdownSound', 'assets/sounds/countdown.mp3');
+
+  // 퀴즈 데이터 로드
+  fetch('data/quiz_data.json')
+  .then(response => response.json())
+  .then(data => {
+    quizData = data; // 퀴즈 데이터 저장
+  })
+  .catch(error => {
+    console.error('퀴즈 데이터 로드 실패:', error);
+  });
 }
 
 function create() {
@@ -84,6 +133,11 @@ function create() {
   this.hitSound = this.sound.add('hitSound');
   this.explosionSound = this.sound.add('explosionSound');
   this.enemyBulletSound = this.sound.add('enemyBulletSound');
+  this.correctSound = this.sound.add('correctSound');
+  this.countdownSound = this.sound.add('countdownSound');
+
+  const sounds = [this.bgm, this.bossBgm, this.coinBgm, this.nextBgm, this.buttonSound, this.coinSound, 
+    this.hitSound, this.explosionSound, this.enemyBulletSound, this.correctSound, this.countdownSound];
 
   // 첫화면 배경 추가
   backgroundImg = this.add.image(this.scale.width / 2, this.scale.height / 2, 'startBackground')
@@ -125,19 +179,19 @@ function create() {
   soundButton = this.add.image(this.scale.width - 20, this.scale.height - 20, 'soundButton').setVisible(false).setScale(0.5).setDepth(2);
 
   //------------------------------------------------------------------------------------------- 실행
-  this.bgm.play();
+  this.bgm && this.bgm.play();
 
   // 버튼 클릭 이벤트
   startButton.setInteractive({ useHandCursor: true });
   startButton.on('pointerdown', () => {
     howToButton.destroy();
-    this.buttonSound.play();
+    this.buttonSound && this.buttonSound.play();
     startGame.call(this);
   });
 
   howToButton.setInteractive({ useHandCursor: true });
   howToButton.on('pointerdown', () => {
-    this.buttonSound.play();
+    this.buttonSound && this.buttonSound.play();
     showHowToPopup.call(this);
   });
 
@@ -145,24 +199,21 @@ function create() {
   muteButton.on('pointerdown', () => {
     muteButton.setVisible(false);
     soundButton.setVisible(true);
-    this.buttonSound.play();
-    if (this.bgm) this.bgm.setVolume(0);
-    if (this.bossBgm) this.bossBgm.setVolume(0);
-    if (this.coinSound) this.coinSound.setVolume(0);
-    if (this.hitSound) this.hitSound.setVolume(0);
-    if (this.explosionSound) this.explosionSound.setVolume(0);
+    this.buttonSound && this.buttonSound.play();
+    sounds.forEach(sound => {
+      if (sound) sound.setVolume(0);
+    });
   });
 
   soundButton.setInteractive({ useHandCursor: true });
   soundButton.on('pointerdown', () => {
     soundButton.setVisible(false);
     muteButton.setVisible(true);
-    this.buttonSound.play();
-    if (this.bgm) this.bgm.setVolume(0.5);
-    if (this.bossBgm) this.bossBgm.setVolume(0.5);
-    if (this.coinSound) this.coinSound.setVolume(1);
-    if (this.hitSound) this.hitSound.setVolume(1);
-    if (this.explosionSound) this.explosionSound.setVolume(1);
+    this.buttonSound && this.buttonSound.play();
+    sounds.forEach(sound => {
+      const isBgm = (sound === this.bgm || sound === this.bossBgm || sound === this.coinBgm || sound === this.nextBgm);
+      if (sound) sound.setVolume(isBgm ? 0.5 : 1);
+    });
   });
 }
 
@@ -173,7 +224,7 @@ async function update() {
     this.helpers.children.iterate(helper => {
       if (helper && helper.active && (helper.texture.key === 'helper1' || helper.texture.key === 'helper2')) { 
         helper.x += Math.sin(Date.now() / 500 + helper.y / 100) * 0.5;
-        helper.y += 2;
+  helper.y += 2 * levelConfig[level].speed;
       }
     });
   }
@@ -202,11 +253,11 @@ async function update() {
     if (!bossExists) distance += 1;
     distanceText.setText(`${ Math.floor(distance / 10) } m`);
 
-    // 보스 등장 (한 번만 등장)
-    if (distance === 1000 && !bossAppeared) {
-      if (this.bossBgm && muteButton.visible) {
-        this.bgm.stop();
-        this.bossBgm.play();
+    // 보스 등장 
+    if (distance >= levelConfig[level].bossDistance && !bossAppeared) {
+      if (muteButton.visible) {
+        this.bgm && this.bgm.stop();
+        this.bossBgm && this.bossBgm.play();
       }
       bossAppeared = true;
       const boss = this.enemies.create(this.scale.width / 2, -100, 'boss1');
@@ -218,15 +269,17 @@ async function update() {
 
       // 0.5초 후에 기존 적들 제거
       await new Promise(resolve => setTimeout(resolve, 500));
-      const toRemove = [];
-      this.enemies.children.iterate(enemy => (enemy && enemy.active && (enemy.enemyType !== 'boss1')) && toRemove.push(enemy));
+      let toRemove = [];
+      this.enemies.children.iterate(enemy => (enemy && (enemy.enemyType !== 'boss1')) && toRemove.push(enemy));
       toRemove.forEach(enemy => {
         this.tweens.add({
           targets: enemy,
           alpha: 0,
           scale: 0,
           duration: 400,
-          onComplete: () => enemy.disableBody(true, true)
+          onComplete: () => {
+            if (enemy && enemy.body) enemy.disableBody(true, true);
+          }
         });
       });
     }
@@ -234,7 +287,7 @@ async function update() {
 
   // 배경 스크롤 (보스 등장 시 멈춤)
   if (!boss) {
-    backgroundImg.tilePositionY -= 2;
+    backgroundImg.tilePositionY -= 2 * levelConfig[level].speed;
   }
 
   // 플레이어 이동
@@ -247,6 +300,27 @@ async function update() {
   } else {
     playerShake = Math.max(playerShake - 1, 0);
   }
+
+  this.input.on('pointerdown', pointer => {
+    if (!gameStarted || isPaused || isPlayerDead) return;
+    isTouching = true;
+    window.lastTouchX = pointer.x;
+  });
+
+  this.input.on('pointerup', pointer => {
+    isTouching = false;
+    window.lastTouchX = null;
+  });
+
+  this.input.on('pointermove', pointer => {
+    if (!gameStarted || isPaused || isPlayerDead) return;
+    if (isTouching && window.lastTouchX !== null) {
+      const dx = pointer.x - window.lastTouchX;
+      player.x += dx;
+      playerShake = 3;
+      window.lastTouchX = pointer.x;
+    }
+  });
 
   // 보스 좌우 이동 및 y축 고정 (가운데 기준)
   if (boss) {
@@ -315,7 +389,7 @@ function initEnemySpawns() {
       const x = Phaser.Math.Between(50, this.scale.width - 50);
       const enemy = this.enemies.create(x, -50, 'enemy1');
       enemy.enemyType = 'enemy1';
-      enemy.setVelocityY(100);
+      enemy.setVelocityY(100 * levelConfig[level].speed);
       enemy.setScale(0.15);
       enemy.body.setSize(enemy.width * 0.6, enemy.height * 0.6);
       enemy.hitCount = 0;
@@ -331,7 +405,7 @@ function initEnemySpawns() {
       const x = Phaser.Math.Between(50, this.scale.width - 50);
       const enemy = this.enemies.create(x, -50, 'enemy2');
       enemy.enemyType = 'enemy2';
-      enemy.setVelocityY(100);
+       enemy.setVelocityY(100 * levelConfig[level].speed);
       enemy.setScale(0.15);
       enemy.body.setSize(enemy.width * 0.6, enemy.height * 0.6);
       enemy.hitCount = 0;
@@ -353,7 +427,7 @@ function initEnemySpawns() {
       const x = Phaser.Math.Between(50, this.scale.width - 50);
       const enemy = this.enemies.create(x, -50, 'enemy3');
       enemy.enemyType = 'enemy3';
-      enemy.setVelocityY(80);
+      enemy.setVelocityY(80 * levelConfig[level].speed);
       enemy.setScale(0.2);
       enemy.body.setSize(enemy.width * 0.6, enemy.height * 0.6);
       enemy.hitCount = 0;
@@ -373,7 +447,7 @@ function initGameUI() {
   this.add.image(40, 25, 'helper3').setScale(0.13).setDepth(20);
   scoreText = this.add.text(70, 13, '0', {
     fontFamily: 'PFStardustS',
-    fontSize: '26px',
+    fontSize: '24px',
     fontStyle: 'bold',
     fill: '#222',
     stroke: '#fff',
@@ -387,7 +461,7 @@ function initGameUI() {
   distanceDim.fillRoundedRect(6, 48, 120, 32, 10);
   distanceText = this.add.text(70, 53, '0 m', {
     fontFamily: 'PFStardustS',
-    fontSize: '26px',
+    fontSize: '24px',
     fontStyle: 'bold',
     fill: '#222',
     stroke: '#fff',
@@ -469,33 +543,12 @@ function initCollisions () {
         onComplete: () => plusText.destroy()
       });
     }
-  }, null, this);
 
-  // player vs enemy
-  this.physics.add.overlap(player, this.enemies, (playerObj, enemy) => {
-    if (playerObj.isProtected) { // 방패가 있을 때
-      enemy.destroy();
-      playerObj.setTexture('player');
-      playerObj.isProtected = false;
-    } else if (!isPlayerDead) {
-      playerObj.setTexture('playerCrash');
-      gameStarted = false;
-      this.bgm.stop();
-      this.enemies.setVelocityY(0);
-      this.helpers.setVelocityY(0);
-
-      tryCount--;
-      if (tryText) tryText.setText(tryCount);
-      isPlayerDead = true;
-
-      // html에 있는 js-quizBox 보여주기
-      const quizBox = document.querySelector('.js-quizBox');
-      quizBox.classList.add('on');
-      // 캔버스에는 disable 클래스 추가
-      const gameCanvas = document.querySelector('canvas');
-      gameCanvas.classList.add('disabled');
+    // walkie인 경우 (시도 횟수 증가)
+    if (helperObj.texture && helperObj.texture.key === 'walkie') {
+      tryCount++;
+      tryText.setText(tryCount);
     }
-
   }, null, this);
 
   // player bullet vs enemy
@@ -557,6 +610,7 @@ function initCollisions () {
         // 0.5초 후에
         this.time.delayedCall(500, () => {
           // 폭발 이펙트 후 제거
+          if (!bossAppeared || isPlayerDead) return;
           this.tweens.add({
             targets: enemy,
             alpha: 0,
@@ -564,13 +618,16 @@ function initCollisions () {
             duration: 400,
             onComplete: () => {
               enemy.destroy();
-              if (this.bossBgm && muteButton.visible) {
-                this.bossBgm.stop();
-                this.coinBgm.play();
-              }
+              // enemy의 bullet도 모두 제거
+              this.bossBullets.clear(true, true);
+
+              this.bgm && this.bgm.stop();
+              this.bossBgm && this.bossBgm.stop();
+              this.coinBgm && this.coinBgm.play();
 
               for (let row = 0; row < 9; row++) {
                 for (let col = 0; col < 5; col++) {
+                  if (row === 4 && col === 2) continue;
                   const offsetX = (col - 2) * 40;
                   const offsetY = (row - 4) * 40;
                   const helper = this.helpers.create(this.scale.width / 2 + offsetX, enemy.y + offsetY, 'helper3');
@@ -579,13 +636,54 @@ function initCollisions () {
                 }
               }
 
+              // 가운데에 walkie 추가
+              const walkie = this.helpers.create(this.scale.width / 2, enemy.y, 'walkie');
+              walkie.setScale(0.3);
+              walkie.setVelocityY(100);
+
               this.time.delayedCall(7000, () => {
                 // 게임 정지
                 gameStarted = false;
-                console.log("넥스트~레벨~");
-                this.coinBgm.stop();
-                this.nextBgm.play();
-                // bossAppeared = false;
+                this.coinBgm && this.coinBgm.stop();
+                this.nextBgm && this.nextBgm.play();
+              
+                // 현재 점수 화면 가운데 표시
+                const scoreDisplay = this.add.text(this.scale.width / 2, this.scale.height / 2 - 50, `점수: ${score}`, {
+                  fontFamily: 'PFStardustS',
+                  fontSize: '36px',
+                  color: '#ffffff',
+                  align: 'center',
+                  stroke: '#222',
+                  strokeThickness: 6
+                });
+                scoreDisplay.setOrigin(0.5);
+
+                // 레벨 표시
+                const levelDisplay = this.add.text(this.scale.width / 2, this.scale.height / 2 + 10, `레벨 ${level} 완료!`, {
+                  fontFamily: 'PFStardustS',
+                  fontSize: '30px',
+                  color: '#ffff00',
+                  align: 'center',
+                  stroke: '#222',
+                  strokeThickness: 6
+                });
+                levelDisplay.setOrigin(0.5);
+
+                setTimeout(() => {
+                  // 레벨업
+                  level++;
+                  // 게임 재시작
+                  // 배경 변경(임시)
+                  const bgKey = level % 3 === 1 ? 'background' : (level % 3 === 2 ? 'background2' : 'background3');
+                  backgroundImg.setTexture(bgKey);
+                  backgroundImg.tilePositionY = 0;
+                  gameStarted = true;
+                  bossAppeared = false;
+                  this.coinBgm && this.coinBgm.stop();
+                  this.bgm && this.bgm.play();
+                  scoreDisplay.destroy();
+                  levelDisplay.destroy();
+                }, 5000);
               });
             }
           });
@@ -594,26 +692,72 @@ function initCollisions () {
     }
   }, null, this);
 
+  // player vs enemy
+  this.physics.add.overlap(player, this.enemies, (playerObj, enemy) => {
+    if (isPlayerDead) return;
+    enemy.destroy();
+
+    if (playerObj.isProtected) {
+      playerObj.setTexture('player');
+      playerObj.isProtected = false;
+    } else {
+      this.physics.pause();
+      playerObj.setTexture('playerCrash');
+      gameStarted = false;
+      isPlayerDead = true;
+      gameOverCount++;
+      counts.forEach((count) => count.textContent = gameOverCount);
+
+      this.bossBgm && this.bossBgm.pause();
+      this.bgm && this.bgm.pause();
+      quizBox.classList.add(ACT_ON);
+      this.sys.canvas.classList.add('disabled');
+      alertBox.setAttribute('data-type', 'crash');
+
+      // 2초 후에 js-alert 보여주기
+      setTimeout(() => {
+        quizBox.classList.remove(ACT_ON);
+        alertBox.classList.add(ACT_ON);
+      }, 2000);
+    }
+  }, null, this);
+
   // enemy bullet vs player
   this.physics.add.overlap(player, this.bossBullets, (playerObj, bullet) => {
     bullet.destroy();
-    // 플레이어가 보호막 없으면 죽음 처리
-    if (!playerObj.isProtected && !isPlayerDead) {
-      playerObj.setTexture('playerCrash');
-      gameStarted = false;
-      this.bgm.stop();
-      this.bossBgm.stop();
-      this.enemies.setVelocityY(0);
-      this.helpers.setVelocityY(0);
-      tryCount--;
-      if (tryText) tryText.setText(tryCount);
-      isPlayerDead = true;
-    } else if (playerObj.isProtected) {
+    
+    if (playerObj.isProtected) {
       playerObj.setTexture('player');
       playerObj.isProtected = false;
+    } else {
+      this.physics.pause();
+      playerObj.setTexture('playerCrash');
+      gameStarted = false;
+      isPlayerDead = true;
+
+      // 모바일 진동 처리
+      if (window.navigator && window.navigator.vibrate) {
+        window.navigator.vibrate([200, 100, 200]);
+      }
+
+      gameOverCount++;
+      counts.forEach((count) => count.textContent = gameOverCount);
+
+      this.bossBgm && this.bossBgm.pause();
+      this.bgm && this.bgm.pause();
+      quizBox.classList.add(ACT_ON);
+      this.sys.canvas.classList.add('disabled');
+      alertBox.setAttribute('data-type', 'crash');
+
+      // 2초 후에 js-alert 보여주기
+      setTimeout(() => {
+        quizBox.classList.remove(ACT_ON);
+        alertBox.classList.add(ACT_ON);
+      }, 2000);
     }
   }, null, this);
 }
+
 
 function initPlayerShooting() {
   this.playerBullets = this.physics.add.group(); // 플레이어 총알 그룹
@@ -645,7 +789,7 @@ function initBossShooting() {
   this.bossBullets = this.physics.add.group(); // 보스 총알 그룹
 
   this.time.addEvent({ // 보스가 총알 발사
-    delay: 4000,
+    delay: 5000,
     callback: () => {
       // 보스가 등장 중일 때만 발사
       const boss = this.enemies.getChildren().find(e => e.enemyType === 'boss1' && e.active);
@@ -653,10 +797,11 @@ function initBossShooting() {
         // 플레이어 방향 벡터 계산
         const bulletPatterns = [
           () => {
-            for (let i = 0; i < 3; i++) {
+            for (let i = 0; i < levelConfig[level].bulletCount; i++) {
               const bullet = this.bossBullets.create(boss.x, boss.y + 40, 'enemyBullet');
               bullet.setScale(0.2);
-              bullet.setVelocity((i - 1) * 50, 220); // -50, 0, 50
+              // bullet.setVelocity((i - 1) * 50 * levelConfig[level].speed, 220 * levelConfig[level].speed); // 속도 증가
+              bullet.setVelocity((i - 1) * 50, 220); // 속도 증가
               bullet.setDepth(10);
               bullet.body.setSize(bullet.width * 0.7, bullet.height * 0.7);
             }
@@ -665,7 +810,7 @@ function initBossShooting() {
 
         const patternIndex = Phaser.Math.Between(0, bulletPatterns.length - 1);
         bulletPatterns[patternIndex]();
-        this.enemyBulletSound.play();
+        this.enemyBulletSound && this.enemyBulletSound.play();
       }
     },
     loop: true
@@ -673,6 +818,8 @@ function initBossShooting() {
 }
 
 function startGame() {
+  console.log("게임 시작!");
+
   this.helpers = this.physics.add.group();
   this.enemies = this.physics.add.group();
   gameStarted = true;
@@ -684,11 +831,11 @@ function startGame() {
   pauseButton.setInteractive({ useHandCursor: true });
   pauseButton.on('pointerdown', () => {
     isPaused = true;
-    this.buttonSound.play();
+    this.buttonSound && this.buttonSound.play();
     pauseButton.setVisible(false);
     playButton.setVisible(true);
-    this.bgm.pause();
-    this.bossBgm.pause();
+    this.bgm && this.bgm.pause();
+    this.bossBgm && this.bossBgm.pause();
     this.enemies.setVelocityY(0);
     this.helpers.setVelocityY(0);
   });
@@ -696,13 +843,11 @@ function startGame() {
   playButton.setInteractive({ useHandCursor: true });
   playButton.on('pointerdown', () => {
     isPaused = false;
-    this.buttonSound.play();
+    this.buttonSound && this.buttonSound.play();
     playButton.setVisible(false);
     pauseButton.setVisible(true);
-    if (muteButton.visible) {
-      this.bgm.resume();
-      this.bossBgm.resume();
-    }
+    this.bgm && this.bgm.resume();
+    this.bossBgm && this.bossBgm.resume();
     this.enemies.setVelocityY(100);
     this.helpers.setVelocityY(100);
   });
@@ -725,7 +870,123 @@ function startGame() {
   initCollisions.call(this); // 충돌 처리 초기화
   initGameUI.call(this); // 부가요소 초기화
   this.cursors = this.input.keyboard.createCursorKeys(); // 키 입력
+  // 모바일 감지
+  isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+
 }
 
 // ------------------------------------------------------------------------------------------ 게임 실행
-window.onload = () => 	game = new Phaser.Game(config);
+window.onload = () => {
+  game = new Phaser.Game(config);
+
+  endBtn.addEventListener('click', () => { // 끝내기 버튼
+    alertBox.classList.remove(ACT_ON);
+    wrongPopup.classList.add(ACT_ON);
+    userScore.textContent = score;
+    if (game && game.scene && game.scene.scenes[0] && game.scene.scenes[0].buttonSound) {
+      game.scene.scenes[0].buttonSound.play();
+    }
+  });
+
+  restartBtn.addEventListener('click', () => { // 처음으로 버튼
+    document.querySelector('canvas').classList.remove('disabled');
+    wrongPopup.classList.remove(ACT_ON);
+    if (game && game.scene && game.scene.scenes[0] && game.scene.scenes[0].buttonSound) {
+      game.scene.scenes[0].buttonSound.play();
+    }
+    game.scene.scenes[0].scene.restart();
+    gameStarted = false;
+    isPlayerDead = false;
+    bossAppeared = false;
+    tryCount = 3;
+    if (tryText) tryText.setText(tryCount);
+    repairCount = 0;
+    if (repairText) repairText.setText(repairCount);
+    score = 0;
+    distance = 0;
+    gameOverCount = 0;
+    counts.forEach(count => count.textContent = repairCount);
+    requestBtn.disabled = false;
+  });
+
+  requestBtn.addEventListener('click', () => { // 요청 버튼
+    alertBox.classList.remove(ACT_ON);
+    if (game && game.scene && game.scene.scenes[0] && game.scene.scenes[0].buttonSound) {
+      game.scene.scenes[0].buttonSound.play();
+    }
+    quizContainer.classList.add(ACT_ON);
+    answer.value = '';
+
+    repairCount++;
+    if (repairText) repairText.setText(repairCount);
+
+    tryCount -= gameOverCount;
+    if (tryCount <= 0) {
+      tryCount = 0;
+      requestBtn.disabled = true;
+    }
+    if (tryText) tryText.setText(tryCount);
+
+    const randomNum = Phaser.Math.Between(0, quizData.length - 1);
+    const randomQuiz = quizData[randomNum];
+    question.textContent = randomQuiz.question;
+    answer.setAttribute('data-answer', randomQuiz.answer);
+  });
+
+  submitBtn.addEventListener('click', () => { // 제출 버튼
+    const userAnswer = answer.value.trim();
+    const correctAnswer = answer.getAttribute('data-answer');
+
+    if (userAnswer === '') return; // 빈 값일 때는 무시
+
+    if (userAnswer.toLowerCase() === correctAnswer.toLowerCase()) { // 정답일 때, 이어하기
+      if (game && game.scene && game.scene.scenes[0] && game.scene.scenes[0].correctSound) {
+        game.scene.scenes[0].correctSound.play();
+      }
+      quizContainer.classList.remove(ACT_ON);
+      document.querySelector('canvas').classList.remove('disabled');
+
+      // 3초 카운트 다운 
+      let countdown = 3;
+      if (game && game.scene && game.scene.scenes[0] && game.scene.scenes[0].add && game.scene.scenes[0].scale) {
+        const countdownText = game.scene.scenes[0].add.text(game.scene.scenes[0].scale.width / 2, game.scene.scenes[0].scale.height / 2, countdown, {
+          fontFamily: 'PFStardustS',
+          fontSize: '72px',
+          fontStyle: 'bold',
+          fill: '#ff0',
+          stroke: '#222',
+          strokeThickness: 6
+        }).setOrigin(0.5).setDepth(30);
+        if (game.scene.scenes[0].countdownSound) {
+          game.scene.scenes[0].countdownSound.play();
+        }
+        const countdownInterval = setInterval(() => {
+          countdown--;
+          if (countdown > 0) {
+            countdownText.setText(countdown);
+          } else {
+            clearInterval(countdownInterval);
+            countdownText.destroy();
+            // 화면에 있는 적들과 아이템들 제거
+            // game.scene.scenes[0].enemies.clear(true, true);
+            // game.scene.scenes[0].helpers.clear(true, true);
+            game.scene.scenes[0].physics.resume();
+
+            gameStarted = true;
+            player.setTexture('player');
+            if (muteButton.visible) {
+              bossAppeared ? game.scene.scenes[0].bossBgm.resume() : game.scene.scenes[0].bgm.resume();
+            }
+            setTimeout(() => isPlayerDead = false, 500);
+          }
+        }, 1000);
+      }
+    } else { // 오답일 때, 게임 오버
+      gameOverCount++;
+      counts.forEach((count) => count.textContent = gameOverCount);
+      quizContainer.classList.remove(ACT_ON);
+      alertBox.setAttribute('data-type', 'wrong');
+      alertBox.classList.add(ACT_ON);
+    }
+  });
+};
