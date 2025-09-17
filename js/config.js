@@ -32,3 +32,17 @@ const config = {
     },
   },
 };
+
+// bossHit은 4의 배수로 설정하기
+const levelConfig = {
+  1: { bossDistance: 1500, bulletCount: 3, speed: 1, bossHit: 20 },
+  2: { bossDistance: 4000, bulletCount: 4, speed: 1.5, bossHit: 28 },
+  3: { bossDistance: 8000, bulletCount: 5, speed: 1.8, bossHit: 44 },
+  4: { bossDistance: 12000, bulletCount: 5, speed: 2, bossHit: 60 },
+  5: { bossDistance: 16000, bulletCount: 6, speed: 2.5, bossHit: 76 },
+  6: { bossDistance: 20000, bulletCount: 6, speed: 2.8, bossHit: 92 },
+  7: { bossDistance: 24000, bulletCount: 7, speed: 3, bossHit: 108 },
+  8: { bossDistance: 28000, bulletCount: 7, speed: 3.5, bossHit: 124 },
+  9: { bossDistance: 32000, bulletCount: 8, speed: 4, bossHit: 140 },
+  10: { bossDistance: 40000, bulletCount: 8, speed: 4.5, bossHit: 156 }
+};

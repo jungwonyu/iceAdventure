@@ -41,19 +41,6 @@ const submitBtn = document.querySelector('.js-submitBtn');
 const wrongPopup = document.querySelector('.js-wrongPopup');
 const userScore = document.querySelector('.js-score');
 
-const levelConfig = {
-  1: { bossDistance: 1500, bulletCount: 3, speed: 1, bossHit: 20 },
-  2: { bossDistance: 4000, bulletCount: 4, speed: 1.2, bossHit: 25 },
-  3: { bossDistance: 8000, bulletCount: 5, speed: 1.5, bossHit: 30 },
-  4: { bossDistance: 12000, bulletCount: 5, speed: 1.8, bossHit: 35 },
-  5: { bossDistance: 16000, bulletCount: 6, speed: 2, bossHit: 40 },
-  6: { bossDistance: 20000, bulletCount: 6, speed: 2.2, bossHit: 45 },
-  7: { bossDistance: 24000, bulletCount: 7, speed: 2.5, bossHit: 50 },
-  8: { bossDistance: 28000, bulletCount: 7, speed: 2.8, bossHit: 55 },
-  9: { bossDistance: 32000, bulletCount: 8, speed: 3, bossHit: 60 },
-  10: { bossDistance: 40000, bulletCount: 8, speed: 3.2, bossHit: 70 }
-}
-
 // ------------------------------------------------------------------------------------------ 기본 함수들
 function preload() {
 	// 배경
@@ -225,7 +212,7 @@ async function update() {
     this.helpers.children.iterate(helper => {
       if (helper && helper.active && (helper.texture.key === 'helper1' || helper.texture.key === 'helper2')) { 
         helper.x += Math.sin(Date.now() / 500 + helper.y / 100) * 0.5;
-  helper.y += 2 * levelConfig[level].speed;
+        helper.y += 2 * levelConfig[level].speed;
       }
     });
   }
@@ -613,11 +600,11 @@ function initCollisions () {
         enemy.setTexture('boss2');
       }
       // 3대 맞으면 boss3로 변경
-      else if (enemy.hitCount === levelConfig[level].bossHit / 3) {
+      else if (enemy.hitCount === levelConfig[level].bossHit / 4) {
         enemy.setTexture('boss3');
       }
       // 5대 맞으면 boss4로 변경
-      else if (enemy.hitCount === levelConfig[level].bossHit / 3 * 2) {
+      else if (enemy.hitCount === levelConfig[level].bossHit / 2) {
         enemy.setTexture('boss4');
       }
       // 7대 맞으면 boss5로 변경
@@ -727,6 +714,10 @@ function initCollisions () {
       gameOverCount++;
       counts.forEach((count) => count.textContent = gameOverCount);
 
+      if (tryCount < gameOverCount) {
+        requestBtn.disabled = true;
+      }
+
       this.bossBgm && this.bossBgm.pause();
       this.bgm && this.bgm.pause();
       quizBox.classList.add(ACT_ON);
@@ -754,13 +745,12 @@ function initCollisions () {
       gameStarted = false;
       isPlayerDead = true;
 
-      // 모바일 진동 처리
-      if (window.navigator && window.navigator.vibrate) {
-        window.navigator.vibrate([200, 100, 200]);
-      }
-
       gameOverCount++;
       counts.forEach((count) => count.textContent = gameOverCount);
+
+      if (tryCount < gameOverCount) {
+        requestBtn.disabled = true;
+      }
 
       this.bossBgm && this.bossBgm.pause();
       this.bgm && this.bgm.pause();
@@ -890,7 +880,6 @@ function startGame() {
   this.cursors = this.input.keyboard.createCursorKeys(); // 키 입력
   // 모바일 감지
   isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
-
 }
 
 // ------------------------------------------------------------------------------------------ 게임 실행
