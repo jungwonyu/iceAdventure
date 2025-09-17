@@ -42,16 +42,16 @@ const wrongPopup = document.querySelector('.js-wrongPopup');
 const userScore = document.querySelector('.js-score');
 
 const levelConfig = {
-  1: { bossDistance: 800, bulletCount: 3, speed: 1 },
-  2: { bossDistance: 1500, bulletCount: 4, speed: 1.2 },
-  3: { bossDistance: 2000, bulletCount: 5, speed: 1.5 },
-  4: { bossDistance: 3000, bulletCount: 5, speed: 1.8 },
-  5: { bossDistance: 4500, bulletCount: 6, speed: 2 },
-  6: { bossDistance: 6000, bulletCount: 6, speed: 2.2 },
-  7: { bossDistance: 8000, bulletCount: 7, speed: 2.5 },
-  8: { bossDistance: 10000, bulletCount: 7, speed: 2.8 },
-  9: { bossDistance: 13000, bulletCount: 8, speed: 3 },
-  10: { bossDistance: 16000, bulletCount: 8, speed: 3.2 }
+  1: { bossDistance: 1500, bulletCount: 3, speed: 1, bossHit: 20 },
+  2: { bossDistance: 4000, bulletCount: 4, speed: 1.2, bossHit: 25 },
+  3: { bossDistance: 8000, bulletCount: 5, speed: 1.5, bossHit: 30 },
+  4: { bossDistance: 12000, bulletCount: 5, speed: 1.8, bossHit: 35 },
+  5: { bossDistance: 16000, bulletCount: 6, speed: 2, bossHit: 40 },
+  6: { bossDistance: 20000, bulletCount: 6, speed: 2.2, bossHit: 45 },
+  7: { bossDistance: 24000, bulletCount: 7, speed: 2.5, bossHit: 50 },
+  8: { bossDistance: 28000, bulletCount: 7, speed: 2.8, bossHit: 55 },
+  9: { bossDistance: 32000, bulletCount: 8, speed: 3, bossHit: 60 },
+  10: { bossDistance: 40000, bulletCount: 8, speed: 3.2, bossHit: 70 }
 }
 
 // ------------------------------------------------------------------------------------------ 기본 함수들
@@ -146,12 +146,13 @@ function create() {
     .setDepth(0);
 
   // 첫 시작 화면(타이틀)
-  titleText = this.add.text(this.scale.width / 2, this.scale.height / 2 - 150, '아이스의 모험', {
+  titleText = this.add.text(this.scale.width / 2, this.scale.height / 2 - 150, 'Ice Adventure', {
     fontFamily: 'PFStardustS',
     fontSize: '48px',
-    fill: '#fff',
-    stroke: '#222',
-    strokeThickness: 6
+    fontStyle: 'bold',
+    fill: '#0026ffff',
+    stroke: '#ffffff',
+    strokeThickness: 10
   }).setOrigin(0.5).setDepth(1);
 
   // 버튼 텍스트 추가
@@ -159,9 +160,9 @@ function create() {
     fontFamily: 'PFStardustS',
     fontSize: '26px',
     fontStyle: 'bold',
-    fill: '#ff0',
-    stroke: '#222',
-    strokeThickness: 4
+    fill: '#0026ffff',
+    stroke: '#ffffff',
+    strokeThickness: 10
   }).setOrigin(0.5).setDepth(2);
 
   // 게임 방법 버튼 추가
@@ -169,9 +170,9 @@ function create() {
     fontFamily: 'PFStardustS',
     fontSize: '26px',
     fontStyle: 'bold',
-    fill: '#fff',
-    stroke: '#222',
-    strokeThickness: 4
+    fill: '#ff3131ff',
+    stroke: '#ffffff',
+    strokeThickness: 10
   }).setOrigin(0.5).setDepth(2);
 
   // 오른쪽 하단 버튼들
@@ -558,6 +559,24 @@ function initCollisions () {
 
     if (!enemy.hitCount) enemy.hitCount = 0;
     enemy.hitCount++;
+
+    // 맞은 hitCount를 boss 옆에 잠시 표시
+    const hitText = this.add.text(enemy.x, enemy.y - 30, `Hit ${enemy.hitCount}`, {
+      fontFamily: 'PFStardustS',
+      fontSize: '20px',
+      fontStyle: 'bold',
+      fill: 'rgba(255, 0, 0, 1)',
+      stroke: '#ffffffff',
+      strokeThickness: 4
+    }).setOrigin(0.5).setDepth(15);
+    this.tweens.add({
+      targets: hitText,
+      y: hitText.y - 20,
+      alpha: 0,
+      duration: 800,
+      ease: 'Power1',
+      onComplete: () => hitText.destroy()
+    });
     
     if (enemy.enemyType === 'enemy1') { // 선인장
       if (enemy.hitCount === 1) {
@@ -594,15 +613,15 @@ function initCollisions () {
         enemy.setTexture('boss2');
       }
       // 3대 맞으면 boss3로 변경
-      else if (enemy.hitCount === 5) {
+      else if (enemy.hitCount === levelConfig[level].bossHit / 3) {
         enemy.setTexture('boss3');
       }
       // 5대 맞으면 boss4로 변경
-      else if (enemy.hitCount === 15) {
+      else if (enemy.hitCount === levelConfig[level].bossHit / 3 * 2) {
         enemy.setTexture('boss4');
       }
       // 7대 맞으면 boss5로 변경
-      else if (enemy.hitCount === 20) {
+      else if (enemy.hitCount === levelConfig[level].bossHit) {
         enemy.setTexture('boss5');
         if (this.explosionSound && muteButton.visible) {
           this.explosionSound.play();
@@ -618,9 +637,7 @@ function initCollisions () {
             duration: 400,
             onComplete: () => {
               enemy.destroy();
-              // enemy의 bullet도 모두 제거
               this.bossBullets.clear(true, true);
-
               this.bgm && this.bgm.stop();
               this.bossBgm && this.bossBgm.stop();
               this.coinBgm && this.coinBgm.play();
@@ -651,9 +668,10 @@ function initCollisions () {
                 const scoreDisplay = this.add.text(this.scale.width / 2, this.scale.height / 2 - 50, `점수: ${score}`, {
                   fontFamily: 'PFStardustS',
                   fontSize: '36px',
-                  color: '#ffffff',
+                  fontStyle: 'bold',
+                  fill: '#0026ffff',
                   align: 'center',
-                  stroke: '#222',
+                  stroke: '#ffffff',
                   strokeThickness: 6
                 });
                 scoreDisplay.setOrigin(0.5);
@@ -662,9 +680,10 @@ function initCollisions () {
                 const levelDisplay = this.add.text(this.scale.width / 2, this.scale.height / 2 + 10, `레벨 ${level} 완료!`, {
                   fontFamily: 'PFStardustS',
                   fontSize: '30px',
-                  color: '#ffff00',
+                  fontStyle: 'bold',
+                  fill: '#ff3131ff',
                   align: 'center',
-                  stroke: '#222',
+                  stroke: '#ffffff',
                   strokeThickness: 6
                 });
                 levelDisplay.setOrigin(0.5);
@@ -800,8 +819,7 @@ function initBossShooting() {
             for (let i = 0; i < levelConfig[level].bulletCount; i++) {
               const bullet = this.bossBullets.create(boss.x, boss.y + 40, 'enemyBullet');
               bullet.setScale(0.2);
-              // bullet.setVelocity((i - 1) * 50 * levelConfig[level].speed, 220 * levelConfig[level].speed); // 속도 증가
-              bullet.setVelocity((i - 1) * 50, 220); // 속도 증가
+              bullet.setVelocity((i - 1) * 50, 220);
               bullet.setDepth(10);
               bullet.body.setSize(bullet.width * 0.7, bullet.height * 0.7);
             }
@@ -954,7 +972,7 @@ window.onload = () => {
           fontSize: '72px',
           fontStyle: 'bold',
           fill: '#ff0',
-          stroke: '#222',
+          stroke: '#ffffff',
           strokeThickness: 6
         }).setOrigin(0.5).setDepth(30);
         if (game.scene.scenes[0].countdownSound) {

@@ -244,3 +244,46 @@ canvas.disabled {
   position: absolute;
   bottom: -60px;
 }
+
+@media (max-width: 480px) {
+  .quizContainer,
+  .quizBox,
+  .alert {
+    width: 100vw;
+    height: 100vw;
+    min-width: 300px;
+    min-height: 300px;
+    font-size: 1.5rem;
+    background-size: contain;
+  }
+
+  .quizContent {
+    width: 90vw;
+    height: 60vw;
+    font-size: 1.3rem;
+    gap: 16px;
+  }
+
+  .question {
+    font-size: 1.5rem;
+    width: 80vw;
+    height: 60px;
+    top: 110px;
+  }
+
+  .answerBox {
+    width: 300px;
+    height: 40px;
+    bottom: 140px;
+  }
+
+  input {
+    width: 100%;
+  }
+
+  .submitBtn {
+    bottom: 60px;
+    font-size: 1rem;
+    padding: 6px 12px;
+  }
+}
