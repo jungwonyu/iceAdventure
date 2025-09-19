@@ -97,7 +97,9 @@ function preload() {
   this.load.audio('explosionSound', 'assets/sounds/explosion.mp3');
   this.load.audio('enemyBulletSound', 'assets/sounds/enemy_bullet.mp3');
   this.load.audio('correctSound', 'assets/sounds/correct.mp3');
+  this.load.audio('incorrectSound', 'assets/sounds/incorrect.mp3');
   this.load.audio('countdownSound', 'assets/sounds/countdown.mp3');
+  this.load.audio('nextLevelSound', 'assets/sounds/next_level.mp3');
 
   // 퀴즈 데이터 로드
   fetch('data/quiz_data.json')
@@ -121,10 +123,12 @@ function create() {
   this.explosionSound = this.sound.add('explosionSound');
   this.enemyBulletSound = this.sound.add('enemyBulletSound');
   this.correctSound = this.sound.add('correctSound');
+  this.incorrectSound = this.sound.add('incorrectSound');
   this.countdownSound = this.sound.add('countdownSound');
+  this.nextLevelSound = this.sound.add('nextLevelSound');
 
   const sounds = [this.bgm, this.bossBgm, this.coinBgm, this.nextBgm, this.buttonSound, this.coinSound, 
-    this.hitSound, this.explosionSound, this.enemyBulletSound, this.correctSound, this.countdownSound];
+    this.hitSound, this.explosionSound, this.enemyBulletSound, this.correctSound, this.incorrectSound, this.countdownSound, this.nextLevelSound];
 
   // 첫화면 배경 추가
   backgroundImg = this.add.image(this.scale.width / 2, this.scale.height / 2, 'startBackground')
@@ -221,7 +225,7 @@ async function update() {
   if (this.enemies) { 
     this.enemies.children.iterate(enemy => {
       if (enemy && enemy.active && enemy.enemyType === 'enemy3' && !enemy.isHit) { // enemy3 좌우 진동 이동
-        enemy.x += Math.sin(Date.now() / 600 + enemy.y / 100) * 0.8;
+        enemy.x += Math.sin(Date.now() / 600 + enemy.y / 100) * 0.9;
       }
       // 보스 객체 찾기
       if (enemy && enemy.active && enemy.enemyType === 'boss1') {
@@ -330,6 +334,11 @@ async function update() {
   } else {
     player.y = this.scale.height - 80;
   }
+  // 실드 오버레이 위치 동기화
+  if (player && player.shieldOverlay) {
+    player.shieldOverlay.x = player.x;
+    player.shieldOverlay.y = player.y;
+  }
 }
 
 // ------------------------------------------------------------------------------------------ 추가 함수들
@@ -368,10 +377,17 @@ function showHowToPopup() {
   });
 }
 
+let enemy1SpawnEvent, enemy2SpawnEvent, enemy3SpawnEvent;
+
 function initEnemySpawns() {
+  // 기존 이벤트 제거
+  if (enemy1SpawnEvent) enemy1SpawnEvent.remove();
+  if (enemy2SpawnEvent) enemy2SpawnEvent.remove();
+  if (enemy3SpawnEvent) enemy3SpawnEvent.remove();
+
   // enemy1 생성
-  this.time.addEvent({
-    delay: 2000,
+  enemy1SpawnEvent = this.time.addEvent({
+    delay: Math.max(2000 / (level * 0.5), 200),
     callback: () => {
       if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
       const x = Phaser.Math.Between(50, this.scale.width - 50);
@@ -386,14 +402,14 @@ function initEnemySpawns() {
   });
 
   // enemy2 생성
-  this.time.addEvent({
-    delay: 3000,
+  enemy2SpawnEvent = this.time.addEvent({
+    delay: Math.max(3000 / (level * 0.5), 300),
     callback: () => {
       if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
       const x = Phaser.Math.Between(50, this.scale.width - 50);
       const enemy = this.enemies.create(x, -50, 'enemy2');
       enemy.enemyType = 'enemy2';
-       enemy.setVelocityY(100 * levelConfig[level].speed);
+      enemy.setVelocityY(100 * levelConfig[level].speed);
       enemy.setScale(0.15);
       enemy.body.setSize(enemy.width * 0.6, enemy.height * 0.6);
       enemy.hitCount = 0;
@@ -408,8 +424,8 @@ function initEnemySpawns() {
     frameRate: 5,
     repeat: -1
   });
-  this.time.addEvent({
-    delay: 5000,
+  enemy3SpawnEvent = this.time.addEvent({
+    delay: Math.max(5000 / (level * 0.5), 500),
     callback: () => {
       if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
       const x = Phaser.Math.Between(50, this.scale.width - 50);
@@ -507,8 +523,19 @@ function initCollisions () {
 
     // helper2인 경우 (방패)
     if (helperObj.texture && helperObj.texture.key === 'helper2') {
-      playerObj.setTexture('playerProtection');
       playerObj.isProtected = true;
+      // 기존 실드가 있으면 제거
+      if (playerObj.shieldOverlay) {
+        playerObj.shieldOverlay.destroy();
+        playerObj.shieldOverlay = null;
+      }
+      const shield = this.add.graphics();
+      shield.fillStyle(0x66ccff, 0.4); // 하늘색, 반투명
+      shield.fillCircle(0, 0, playerObj.width * 0.1); 
+      shield.setDepth(25);
+      shield.x = playerObj.x;
+      shield.y = playerObj.y;
+      playerObj.shieldOverlay = shield;
     }
 
     // helper3인 경우 (점수 획득)
@@ -675,7 +702,7 @@ function initCollisions () {
                 });
                 levelDisplay.setOrigin(0.5);
 
-                setTimeout(() => {
+                setTimeout(async () => {
                   // 레벨업
                   level++;
                   // 게임 재시작
@@ -685,10 +712,14 @@ function initCollisions () {
                   backgroundImg.tilePositionY = 0;
                   gameStarted = true;
                   bossAppeared = false;
-                  this.coinBgm && this.coinBgm.stop();
-                  this.bgm && this.bgm.play();
                   scoreDisplay.destroy();
                   levelDisplay.destroy();
+                  this.coinBgm && this.coinBgm.stop();
+                  this.nextLevelSound && this.nextLevelSound.play();
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  this.bgm && this.bgm.play();
+                  // 적 생성 이벤트 재등록
+                  initEnemySpawns.call(this);
                 }, 5000);
               });
             }
@@ -704,8 +735,12 @@ function initCollisions () {
     enemy.destroy();
 
     if (playerObj.isProtected) {
-      playerObj.setTexture('player');
       playerObj.isProtected = false;
+      // 실드 오버레이 제거
+      if (playerObj.shieldOverlay) {
+        playerObj.shieldOverlay.destroy();
+        playerObj.shieldOverlay = null;
+      }
     } else {
       this.physics.pause();
       playerObj.setTexture('playerCrash');
@@ -737,8 +772,12 @@ function initCollisions () {
     bullet.destroy();
     
     if (playerObj.isProtected) {
-      playerObj.setTexture('player');
       playerObj.isProtected = false;
+      // 실드 오버레이 제거
+      if (playerObj.shieldOverlay) {
+        playerObj.shieldOverlay.destroy();
+        playerObj.shieldOverlay = null;
+      }
     } else {
       this.physics.pause();
       playerObj.setTexture('playerCrash');
@@ -912,6 +951,7 @@ window.onload = () => {
     score = 0;
     distance = 0;
     gameOverCount = 0;
+    level = 1;
     counts.forEach(count => count.textContent = repairCount);
     requestBtn.disabled = false;
   });
@@ -940,7 +980,7 @@ window.onload = () => {
     answer.setAttribute('data-answer', randomQuiz.answer);
   });
 
-  submitBtn.addEventListener('click', () => { // 제출 버튼
+  submitBtn.addEventListener('click', async () => { // 제출 버튼
     const userAnswer = answer.value.trim();
     const correctAnswer = answer.getAttribute('data-answer');
 
@@ -952,6 +992,7 @@ window.onload = () => {
       }
       quizContainer.classList.remove(ACT_ON);
       document.querySelector('canvas').classList.remove('disabled');
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 약간의 딜레이 (정답 사운드 때문)
 
       // 3초 카운트 다운 
       let countdown = 3;
@@ -989,6 +1030,7 @@ window.onload = () => {
         }, 1000);
       }
     } else { // 오답일 때, 게임 오버
+      game.scene.scenes[0].incorrectSound && game.scene.scenes[0].incorrectSound.play();
       gameOverCount++;
       counts.forEach((count) => count.textContent = gameOverCount);
       quizContainer.classList.remove(ACT_ON);
