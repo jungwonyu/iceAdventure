@@ -141,7 +141,7 @@ function create() {
     fontFamily: 'PFStardustS',
     fontSize: '48px',
     fontStyle: 'bold',
-    fill: '#0026ffff',
+    fill: '#9c782bff',
     stroke: '#ffffff',
     strokeThickness: 10
   }).setOrigin(0.5).setDepth(1);
@@ -151,7 +151,7 @@ function create() {
     fontFamily: 'PFStardustS',
     fontSize: '26px',
     fontStyle: 'bold',
-    fill: '#0026ffff',
+    fill: '#ffbb00ff',
     stroke: '#ffffff',
     strokeThickness: 10
   }).setOrigin(0.5).setDepth(2);
@@ -161,7 +161,7 @@ function create() {
     fontFamily: 'PFStardustS',
     fontSize: '26px',
     fontStyle: 'bold',
-    fill: '#ff3131ff',
+    fill: '#ff7010ff',
     stroke: '#ffffff',
     strokeThickness: 10
   }).setOrigin(0.5).setDepth(2);
@@ -363,7 +363,7 @@ function showHowToPopup() {
   const closeBtn = this.add.text(this.scale.width/2, this.scale.height/2+110, '닫기', {
     fontFamily: 'PFStardustS',
     fontSize: '24px',
-    fill: '#ffd600',
+    fill: '#ffbb00ff',
     stroke: '#222',
     strokeThickness: 6,
     fontStyle: 'bold'
@@ -390,7 +390,7 @@ function initEnemySpawns() {
     delay: Math.max(2000 / (level * 0.5), 200),
     callback: () => {
       if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
-      const x = Phaser.Math.Between(50, this.scale.width - 50);
+      const x = Phaser.Math.Between(20, this.scale.width - 20);
       const enemy = this.enemies.create(x, -50, 'enemy1');
       enemy.enemyType = 'enemy1';
       enemy.setVelocityY(100 * levelConfig[level].speed);
@@ -406,7 +406,7 @@ function initEnemySpawns() {
     delay: Math.max(3000 / (level * 0.5), 300),
     callback: () => {
       if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
-      const x = Phaser.Math.Between(50, this.scale.width - 50);
+      const x = Phaser.Math.Between(20, this.scale.width - 20);
       const enemy = this.enemies.create(x, -50, 'enemy2');
       enemy.enemyType = 'enemy2';
       enemy.setVelocityY(100 * levelConfig[level].speed);
@@ -428,7 +428,7 @@ function initEnemySpawns() {
     delay: Math.max(5000 / (level * 0.5), 500),
     callback: () => {
       if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
-      const x = Phaser.Math.Between(50, this.scale.width - 50);
+      const x = Phaser.Math.Between(20, this.scale.width - 20);
       const enemy = this.enemies.create(x, -50, 'enemy3');
       enemy.enemyType = 'enemy3';
       enemy.setVelocityY(80 * levelConfig[level].speed);
@@ -506,6 +506,7 @@ function initGameUI() {
 function initCollisions () {
   // player vs helper
   this.physics.add.overlap(player, this.helpers, (playerObj, helperObj) => {
+    if (isPaused) return;
     helperObj.destroy();
     this.coinSound.play();
 
@@ -545,8 +546,8 @@ function initCollisions () {
         fontFamily: 'PFStardustS',
         fontSize: '20px',
         fontStyle: 'bold',
-        fill: '#ff0',
-        stroke: '#222',
+        fill: '#ffbb00ff',
+        stroke: '#ffffffff',
         strokeThickness: 4
       }).setOrigin(0.5).setDepth(15);
       this.tweens.add({
@@ -568,6 +569,7 @@ function initCollisions () {
 
   // player bullet vs enemy
   this.physics.add.overlap(this.playerBullets, this.enemies, (bullet, enemy) => {
+    if (isPaused) return;
     bullet.destroy();
     this.hitSound.play();
 
@@ -683,7 +685,7 @@ function initCollisions () {
                   fontFamily: 'PFStardustS',
                   fontSize: '36px',
                   fontStyle: 'bold',
-                  fill: '#0026ffff',
+                  fill: '#ffbb00ff',
                   align: 'center',
                   stroke: '#ffffff',
                   strokeThickness: 6
@@ -695,7 +697,7 @@ function initCollisions () {
                   fontFamily: 'PFStardustS',
                   fontSize: '30px',
                   fontStyle: 'bold',
-                  fill: '#ff3131ff',
+                  fill: '#ffbb00ff',
                   align: 'center',
                   stroke: '#ffffff',
                   strokeThickness: 6
@@ -731,7 +733,7 @@ function initCollisions () {
 
   // player vs enemy
   this.physics.add.overlap(player, this.enemies, (playerObj, enemy) => {
-    if (isPlayerDead) return;
+    if (isPlayerDead || isPaused) return;
     enemy.destroy();
 
     if (playerObj.isProtected) {
@@ -769,6 +771,7 @@ function initCollisions () {
 
   // enemy bullet vs player
   this.physics.add.overlap(player, this.bossBullets, (playerObj, bullet) => {
+    if (isPaused) return;
     bullet.destroy();
     
     if (playerObj.isProtected) {
