@@ -225,7 +225,12 @@ async function update() {
   if (this.enemies) { 
     this.enemies.children.iterate(enemy => {
       if (enemy && enemy.active && enemy.enemyType === 'enemy3' && !enemy.isHit) { // enemy3 좌우 진동 이동
-        enemy.x += Math.sin(Date.now() / 600 + enemy.y / 100) * 0.9;
+        const newX = enemy.x + Math.sin(Date.now() / 600 + enemy.y / 100) * 1.5;
+        // 화면 경계 체크 (enemy 크기 고려)
+        const enemyHalfWidth = enemy.width * enemy.scaleX * 0.5;
+        if (newX >= enemyHalfWidth && newX <= this.scale.width - enemyHalfWidth) {
+          enemy.x = newX;
+        }
       }
       // 보스 객체 찾기
       if (enemy && enemy.active && enemy.enemyType === 'boss1') {
@@ -279,7 +284,7 @@ async function update() {
 
   // 배경 스크롤 (보스 등장 시 멈춤)
   if (!boss) {
-    backgroundImg.tilePositionY -= 2 * levelConfig[level].speed;
+    backgroundImg.tilePositionY -= 5 * levelConfig[level].speed;
   }
 
   // 플레이어 이동
@@ -387,7 +392,7 @@ function initEnemySpawns() {
 
   // enemy1 생성
   enemy1SpawnEvent = this.time.addEvent({
-    delay: Math.max(2000 / (level * 0.5), 200),
+    delay: Math.max(1500 / (level * 0.5), 200),
     callback: () => {
       if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
       const x = Phaser.Math.Between(20, this.scale.width - 20);
@@ -403,7 +408,7 @@ function initEnemySpawns() {
 
   // enemy2 생성
   enemy2SpawnEvent = this.time.addEvent({
-    delay: Math.max(3000 / (level * 0.5), 300),
+    delay: Math.max(2000 / (level * 0.5), 300),
     callback: () => {
       if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
       const x = Phaser.Math.Between(20, this.scale.width - 20);
@@ -425,7 +430,7 @@ function initEnemySpawns() {
     repeat: -1
   });
   enemy3SpawnEvent = this.time.addEvent({
-    delay: Math.max(5000 / (level * 0.5), 500),
+    delay: Math.max(3000 / (level * 0.5), 500),
     callback: () => {
       if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
       const x = Phaser.Math.Between(20, this.scale.width - 20);
@@ -809,11 +814,10 @@ function initCollisions () {
   }, null, this);
 }
 
-
 function initPlayerShooting() {
   this.playerBullets = this.physics.add.group(); // 플레이어 총알 그룹
   this.time.addEvent({ // 플레이어가 총알 발사
-    delay: 200, 
+    delay: 300, 
     callback: () => {
       if (!gameStarted || isPaused || isPlayerDead) return;
       if (player.isDouble) { // 두발 발사
