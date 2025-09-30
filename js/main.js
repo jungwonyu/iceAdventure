@@ -226,7 +226,6 @@ async function update() {
     this.enemies.children.iterate(enemy => {
       if (enemy && enemy.active && enemy.enemyType === 'enemy3' && !enemy.isHit) { // enemy3 좌우 진동 이동
         const newX = enemy.x + Math.sin(Date.now() / 600 + enemy.y / 100) * 1.5;
-        // 화면 경계 체크 (enemy 크기 고려)
         const enemyHalfWidth = enemy.width * enemy.scaleX * 0.5;
         if (newX >= enemyHalfWidth && newX <= this.scale.width - enemyHalfWidth) {
           enemy.x = newX;
@@ -339,6 +338,7 @@ async function update() {
   } else {
     player.y = this.scale.height - 80;
   }
+
   // 실드 오버레이 위치 동기화
   if (player && player.shieldOverlay) {
     player.shieldOverlay.x = player.x;
@@ -398,7 +398,8 @@ function initEnemySpawns() {
       const x = Phaser.Math.Between(20, this.scale.width - 20);
       const enemy = this.enemies.create(x, -50, 'enemy1');
       enemy.enemyType = 'enemy1';
-      enemy.setVelocityY(100 * levelConfig[level].speed);
+      // enemy.setVelocityY(100 * levelConfig[level].speed);
+      enemy.setVelocityY(200);
       enemy.setScale(0.15);
       enemy.body.setSize(enemy.width * 0.6, enemy.height * 0.6);
       enemy.hitCount = 0;
@@ -414,7 +415,8 @@ function initEnemySpawns() {
       const x = Phaser.Math.Between(20, this.scale.width - 20);
       const enemy = this.enemies.create(x, -50, 'enemy2');
       enemy.enemyType = 'enemy2';
-      enemy.setVelocityY(100 * levelConfig[level].speed);
+      // enemy.setVelocityY(100 * levelConfig[level].speed);
+      enemy.setVelocityY(200);
       enemy.setScale(0.15);
       enemy.body.setSize(enemy.width * 0.6, enemy.height * 0.6);
       enemy.hitCount = 0;
@@ -436,7 +438,8 @@ function initEnemySpawns() {
       const x = Phaser.Math.Between(20, this.scale.width - 20);
       const enemy = this.enemies.create(x, -50, 'enemy3');
       enemy.enemyType = 'enemy3';
-      enemy.setVelocityY(80 * levelConfig[level].speed);
+      // enemy.setVelocityY(80 * levelConfig[level].speed);
+      enemy.setVelocityY(200);
       enemy.setScale(0.2);
       enemy.body.setSize(enemy.width * 0.6, enemy.height * 0.6);
       enemy.hitCount = 0;
@@ -859,7 +862,73 @@ function initBossShooting() {
               bullet.setDepth(10);
               bullet.body.setSize(bullet.width * 0.7, bullet.height * 0.7);
             }
-          }
+          },
+          () => {
+            // 부채꼴로 퍼지는 패턴
+            const angleStep = 30; // 각도 간격
+            const startAngle = -angleStep * Math.floor(levelConfig[level].bulletCount / 2);
+            for (let i = 0; i < levelConfig[level].bulletCount; i++) {
+              const angle = Phaser.Math.DegToRad(startAngle + i * angleStep);
+              const bullet = this.bossBullets.create(boss.x, boss.y + 40, 'enemyBullet');
+              bullet.setScale(0.2);
+              bullet.setVelocity(Math.sin(angle) * 200, Math.cos(angle) * 200);
+              bullet.setDepth(10);
+              bullet.body.setSize(bullet.width * 0.7, bullet.height * 0.7);
+            }
+          },
+          () => {
+            // 플레이어 추적 패턴
+            const playerDirection = Phaser.Math.Angle.Between(boss.x, boss.y, player.x, player.y);
+            for (let i = 0; i < levelConfig[level].bulletCount; i++) {
+              const spread = (i - Math.floor(levelConfig[level].bulletCount / 2)) * 0.3;
+              const angle = playerDirection + spread;
+              const bullet = this.bossBullets.create(boss.x, boss.y + 40, 'enemyBullet');
+              bullet.setScale(0.2);
+              bullet.setVelocity(Math.cos(angle) * 180, Math.sin(angle) * 180);
+              bullet.setDepth(10);
+              bullet.body.setSize(bullet.width * 0.7, bullet.height * 0.7);
+            }
+          },
+          () => {
+            // 원형 패턴 (360도 전방향)
+            const bulletCount = 8;
+            for (let i = 0; i < bulletCount; i++) {
+              const angle = (i / bulletCount) * Math.PI * 2;
+              const bullet = this.bossBullets.create(boss.x, boss.y + 40, 'enemyBullet');
+              bullet.setScale(0.2);
+              bullet.setVelocity(Math.cos(angle) * 150, Math.sin(angle) * 150);
+              bullet.setDepth(10);
+              bullet.body.setSize(bullet.width * 0.7, bullet.height * 0.7);
+            }
+          },
+          () => {
+            // 나선형 패턴
+            const spiralBullets = 6;
+            const spiralOffset = Date.now() * 0.005; // 시간에 따라 회전
+            for (let i = 0; i < spiralBullets; i++) {
+              const angle = (i / spiralBullets) * Math.PI * 2 + spiralOffset;
+              const bullet = this.bossBullets.create(boss.x, boss.y + 40, 'enemyBullet');
+              bullet.setScale(0.2);
+              bullet.setVelocity(Math.cos(angle) * 160, Math.sin(angle) * 160);
+              bullet.setDepth(10);
+              bullet.body.setSize(bullet.width * 0.7, bullet.height * 0.7);
+            }
+          },
+          () => {
+            // V자 패턴
+            const vBullets = levelConfig[level].bulletCount;
+            for (let i = 0; i < vBullets; i++) {
+              const side = i % 2 === 0 ? -1 : 1;
+              const bulletIndex = Math.floor(i / 2);
+              const angle = Phaser.Math.DegToRad(side * (15 + bulletIndex * 10));
+              const bullet = this.bossBullets.create(boss.x, boss.y + 40, 'enemyBullet');
+              bullet.setScale(0.2);
+              bullet.setVelocity(Math.sin(angle) * 200, Math.cos(angle) * 200);
+              bullet.setDepth(10);
+              bullet.body.setSize(bullet.width * 0.7, bullet.height * 0.7);
+            }
+          },
+            
         ];
 
         const patternIndex = Phaser.Math.Between(0, bulletPatterns.length - 1);
