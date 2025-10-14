@@ -17,7 +17,7 @@ const config = {
   physics: {
     default: 'arcade',
     arcade: {
-      // debug: true
+      debug: true
     },
   },
   scene: {
@@ -33,16 +33,15 @@ const config = {
   },
 };
 
-// bossHit은 4의 배수로 설정하기
 const levelConfig = {
-  1: { bossDistance: 1500, bulletCount: 3, speed: 1, bossHit: 20 },
-  2: { bossDistance: 4000, bulletCount: 4, speed: 1.8, bossHit: 28 },
-  3: { bossDistance: 8000, bulletCount: 5, speed: 2.4, bossHit: 44 },
-  4: { bossDistance: 12000, bulletCount: 5, speed: 2.8, bossHit: 60 },
-  5: { bossDistance: 16000, bulletCount: 6, speed: 3.2, bossHit: 76 },
-  6: { bossDistance: 20000, bulletCount: 6, speed: 3.6, bossHit: 92 },
-  7: { bossDistance: 24000, bulletCount: 7, speed: 4, bossHit: 108 },
-  8: { bossDistance: 28000, bulletCount: 7, speed: 4.4, bossHit: 124 },
-  9: { bossDistance: 32000, bulletCount: 8, speed: 4.8, bossHit: 140 },
-  10: { bossDistance: 40000, bulletCount: 8, speed: 5.2, bossHit: 156 }
+  1: { bossDistance: 3000, bulletCount: 3, bossHit: 20, enemy3Count: 1, walkieCount: 1 },
+  2: { bossDistance: 6000, bulletCount: 4, bossHit: 25, enemy3Count: 1, walkieCount: 3 },
+  3: { bossDistance: 9000, bulletCount: 5, bossHit: 30, enemy3Count: 1, walkieCount: 5 },
+  4: { bossDistance: 12000, bulletCount: 5, bossHit: 35, enemy3Count: 2, walkieCount: 7 },
+  5: { bossDistance: 15000, bulletCount: 6, bossHit: 40, enemy3Count: 2, walkieCount: 9 },
+  6: { bossDistance: 18000, bulletCount: 6, bossHit: 45, enemy3Count: 2, walkieCount: 11 },
+  7: { bossDistance: 21000, bulletCount: 7, bossHit: 50, enemy3Count: 3, walkieCount: 13 },
+  8: { bossDistance: 24000, bulletCount: 7, bossHit: 55, enemy3Count: 3, walkieCount: 15 },
+  9: { bossDistance: 27000, bulletCount: 8, bossHit: 60, enemy3Count: 3, walkieCount: 17 },
+  10: { bossDistance: 30000, bulletCount: 8, bossHit: 65, enemy3Count: 3, walkieCount: 19 }
 };

@@ -25,6 +25,7 @@ let quizData = [];
 let gameOverCount = 0;
 let level = 1;
 let isTouching = false;
+let finalLevel = 10;
 
 const alertBox = document.querySelector('.js-alert');
 const quizBox = document.querySelector('.js-quizBox');
@@ -32,7 +33,8 @@ const quizContainer = document.querySelector('.js-quizContainer');
 const restartBtn = document.querySelector('.js-restartBtn');
 const requestBtn = document.querySelector('.js-requestBtn');
 const endBtn = document.querySelector('.js-endBtn');
-const counts = document.querySelectorAll('.js-count');
+const count = document.querySelector('.js-count');
+const walkieCount = document.querySelector('.js-walkieCount');
 
 const question = document.querySelector('.js-question');
 const answer = document.querySelector('.js-answer');
@@ -100,6 +102,7 @@ function preload() {
   this.load.audio('incorrectSound', 'assets/sounds/incorrect.mp3');
   this.load.audio('countdownSound', 'assets/sounds/countdown.mp3');
   this.load.audio('nextLevelSound', 'assets/sounds/next_level.mp3');
+  this.load.audio('finalSound', 'assets/sounds/final.mp3');
 
   // 퀴즈 데이터 로드
   fetch('data/quiz_data.json')
@@ -126,9 +129,9 @@ function create() {
   this.incorrectSound = this.sound.add('incorrectSound');
   this.countdownSound = this.sound.add('countdownSound');
   this.nextLevelSound = this.sound.add('nextLevelSound');
+  this.finalSound = this.sound.add('finalSound');
 
-  const sounds = [this.bgm, this.bossBgm, this.coinBgm, this.nextBgm, this.buttonSound, this.coinSound, 
-    this.hitSound, this.explosionSound, this.enemyBulletSound, this.correctSound, this.incorrectSound, this.countdownSound, this.nextLevelSound];
+  const bgmList = [this.bgm, this.bossBgm, this.coinBgm, this.nextBgm]; // 배경음악 리스트
 
   // 첫화면 배경 추가
   backgroundImg = this.add.image(this.scale.width / 2, this.scale.height / 2, 'startBackground')
@@ -192,8 +195,8 @@ function create() {
     muteButton.setVisible(false);
     soundButton.setVisible(true);
     this.buttonSound && this.buttonSound.play();
-    sounds.forEach(sound => {
-      if (sound) sound.setVolume(0);
+    bgmList.forEach(bgm => {
+      if (bgm) bgm.setVolume(0);
     });
   });
 
@@ -202,9 +205,8 @@ function create() {
     soundButton.setVisible(false);
     muteButton.setVisible(true);
     this.buttonSound && this.buttonSound.play();
-    sounds.forEach(sound => {
-      const isBgm = (sound === this.bgm || sound === this.bossBgm || sound === this.coinBgm || sound === this.nextBgm);
-      if (sound) sound.setVolume(isBgm ? 0.5 : 1);
+    bgmList.forEach(bgm => {
+      if (bgm) bgm.setVolume(0.5);
     });
   });
 }
@@ -216,7 +218,7 @@ async function update() {
     this.helpers.children.iterate(helper => {
       if (helper && helper.active && (helper.texture.key === 'helper1' || helper.texture.key === 'helper2')) { 
         helper.x += Math.sin(Date.now() / 500 + helper.y / 100) * 0.5;
-        helper.y += 2 * levelConfig[level].speed;
+        helper.y += 3;
       }
     });
   }
@@ -225,7 +227,7 @@ async function update() {
   if (this.enemies) { 
     this.enemies.children.iterate(enemy => {
       if (enemy && enemy.active && enemy.enemyType === 'enemy3' && !enemy.isHit) { // enemy3 좌우 진동 이동
-        const newX = enemy.x + Math.sin(Date.now() / 600 + enemy.y / 100) * 1.5;
+        const newX = enemy.x + Math.sin(Date.now() / 2000 + enemy.y / 100) * 3.0;
         const enemyHalfWidth = enemy.width * enemy.scaleX * 0.5;
         if (newX >= enemyHalfWidth && newX <= this.scale.width - enemyHalfWidth) {
           enemy.x = newX;
@@ -239,14 +241,9 @@ async function update() {
   }
 
   if (scoreText) scoreText.setText(score);
+
   if (distanceText) { // 보스가 없을 때만 distance 증가
-    let bossExists = false;
-    if (this.enemies) {
-      this.enemies.children.iterate(enemy => {
-        if (enemy && enemy.active && enemy.enemyType === 'boss1') bossExists = true;
-      });
-    }
-    if (!bossExists) distance += 1;
+    if (!bossAppeared) distance += 1;
     distanceText.setText(`${ Math.floor(distance / 10) } m`);
 
     // 보스 등장 
@@ -263,8 +260,8 @@ async function update() {
       boss.body.setSize(boss.width * 0.6, boss.height * 0.6);
       boss.hitCount = 0;
 
-      // 0.5초 후에 기존 적들 제거
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // 기존 적들 제거
+      await new Promise(resolve => setTimeout(resolve, 200));
       let toRemove = [];
       this.enemies.children.iterate(enemy => (enemy && (enemy.enemyType !== 'boss1')) && toRemove.push(enemy));
       toRemove.forEach(enemy => {
@@ -282,8 +279,16 @@ async function update() {
   }
 
   // 배경 스크롤 (보스 등장 시 멈춤)
-  if (!boss) {
-    backgroundImg.tilePositionY -= 5 * levelConfig[level].speed;
+  if (!bossAppeared) {
+    backgroundImg.tilePositionY -= 3;
+  } else { // 보스 등장 시 상하 이동 추가
+    if (this.cursors.up.isDown) {
+      player.y -= 5;
+      playerShake = 3;
+    } else if (this.cursors.down.isDown) {
+      player.y += 5;
+      playerShake = 3;
+    }
   }
 
   // 플레이어 이동
@@ -301,11 +306,13 @@ async function update() {
     if (!gameStarted || isPaused || isPlayerDead) return;
     isTouching = true;
     window.lastTouchX = pointer.x;
+    window.lastTouchY = pointer.y;
   });
 
   this.input.on('pointerup', pointer => {
     isTouching = false;
     window.lastTouchX = null;
+    window.lastTouchY = null;
   });
 
   this.input.on('pointermove', pointer => {
@@ -315,6 +322,13 @@ async function update() {
       player.x += dx;
       playerShake = 3;
       window.lastTouchX = pointer.x;
+      
+      // 보스 등장 시 상하 이동도 추가
+      if (bossAppeared && window.lastTouchY !== null) {
+        const dy = pointer.y - window.lastTouchY;
+        player.y += dy;
+        window.lastTouchY = pointer.y;
+      }
     }
   });
 
@@ -322,8 +336,7 @@ async function update() {
   if (boss) {
     const bossTargetY = 150;
     const centerX = this.scale.width / 2;
-    // 내려오면서 동시에 좌우 이동
-    boss.x = centerX + Math.sin(Date.now() / 1200) * 120;
+    boss.x = centerX + Math.sin(Date.now() / 1200) * 120; // 내려오면서 동시에 좌우 이동
     if (boss.y < bossTargetY) {
       boss.setVelocityY(60);
     } else {
@@ -335,8 +348,8 @@ async function update() {
   // 플레이어 흔들림 효과 적용
   if (playerShake > 0) {
     player.y += Math.sin(Date.now() / 40) * 2;
-  } else {
-    player.y = this.scale.height - 80;
+  } else if (!bossAppeared) {
+    player.y = this.scale.height - 80; // 보스전이 아닐 때만 플레이어 Y 위치 고정
   }
 
   // 실드 오버레이 위치 동기화
@@ -387,64 +400,72 @@ let enemy1SpawnEvent, enemy2SpawnEvent, enemy3SpawnEvent;
 function initEnemySpawns() {
   // 기존 이벤트 제거
   if (enemy1SpawnEvent) enemy1SpawnEvent.remove();
-  if (enemy2SpawnEvent) enemy2SpawnEvent.remove();
-  if (enemy3SpawnEvent) enemy3SpawnEvent.remove();
+  // if (enemy2SpawnEvent) enemy2SpawnEvent.remove();
+  // if (enemy3SpawnEvent) enemy3SpawnEvent.remove();
 
-  // enemy1 생성
-  enemy1SpawnEvent = this.time.addEvent({
-    delay: Math.max(1500 / (level * 0.5), 200),
-    callback: () => {
-      if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
-      const x = Phaser.Math.Between(20, this.scale.width - 20);
-      const enemy = this.enemies.create(x, -50, 'enemy1');
-      enemy.enemyType = 'enemy1';
-      // enemy.setVelocityY(100 * levelConfig[level].speed);
-      enemy.setVelocityY(200);
-      enemy.setScale(0.15);
-      enemy.body.setSize(enemy.width * 0.6, enemy.height * 0.6);
-      enemy.hitCount = 0;
-    },
-    loop: true
-  });
-
-  // enemy2 생성
-  enemy2SpawnEvent = this.time.addEvent({
-    delay: Math.max(2000 / (level * 0.5), 300),
-    callback: () => {
-      if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
-      const x = Phaser.Math.Between(20, this.scale.width - 20);
-      const enemy = this.enemies.create(x, -50, 'enemy2');
-      enemy.enemyType = 'enemy2';
-      // enemy.setVelocityY(100 * levelConfig[level].speed);
-      enemy.setVelocityY(200);
-      enemy.setScale(0.15);
-      enemy.body.setSize(enemy.width * 0.6, enemy.height * 0.6);
-      enemy.hitCount = 0;
-    },
-    loop: true
-  });
-
-  // enemy3 생성
+  // enemy3 애니메이션 생성
   this.anims.create({
     key: 'fly',
     frames: this.anims.generateFrameNumbers('enemy3', { start: 0, end: 2 }),
-    frameRate: 5,
+    frameRate: 3,
     repeat: -1
   });
-  enemy3SpawnEvent = this.time.addEvent({
-    delay: Math.max(3000 / (level * 0.5), 500),
+
+  // enemy1을 기준으로 순차적 등장 (겹치지 않게)
+  enemy1SpawnEvent = this.time.addEvent({
+    delay: 2500, // 전체 사이클 시간 (enemy1 -> enemy2 -> enemy3 -> 다시 enemy1)
     callback: () => {
       if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
-      const x = Phaser.Math.Between(20, this.scale.width - 20);
-      const enemy = this.enemies.create(x, -50, 'enemy3');
-      enemy.enemyType = 'enemy3';
-      // enemy.setVelocityY(80 * levelConfig[level].speed);
-      enemy.setVelocityY(200);
-      enemy.setScale(0.2);
-      enemy.body.setSize(enemy.width * 0.6, enemy.height * 0.6);
-      enemy.hitCount = 0;
-      enemy.isHit = false;
-      enemy.play('fly');
+      
+      // enemy1 즉시 등장
+      const x1 = Phaser.Math.Between(20, this.scale.width - 20);
+      const enemy1 = this.enemies.create(x1, -50, 'enemy1');
+      enemy1.enemyType = 'enemy1';
+      enemy1.setVelocityY(180);
+      enemy1.setScale(0.15);
+      enemy1.body.setSize(enemy1.width * 0.6, enemy1.height * 0.8);
+      enemy1.hitCount = 0;
+      
+      // enemy1 등장 1초 후에 enemy2 등장
+      this.time.delayedCall(1000, () => {
+        if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
+        const x2 = Phaser.Math.Between(20, this.scale.width - 20);
+        const enemy2 = this.enemies.create(x2, -50, 'enemy2');
+        enemy2.enemyType = 'enemy2';
+        enemy2.setVelocityY(180);
+        enemy2.setScale(0.3);
+        enemy2.body.setSize(enemy2.width * 0.8, enemy2.height * 0.7);
+        enemy2.hitCount = 0;
+      });
+      
+      // enemy1 등장 1.5초 후에 enemy3 등장
+      // this.time.delayedCall(1500, () => {
+      //   if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
+      //   const x3 = Phaser.Math.Between(20, this.scale.width - 20);
+      //   const enemy3 = this.enemies.create(x3, -50, 'enemy3');
+      //   enemy3.enemyType = 'enemy3';
+      //   enemy3.setVelocityY(180);
+      //   enemy3.setScale(0.2);
+      //   enemy3.body.setSize(enemy3.width * 0.6, enemy3.height * 0.6);
+      //   enemy3.hitCount = 0;
+      //   enemy3.isHit = false;
+      //   enemy3.play('fly');
+      // });
+      for (let i = 0; i < levelConfig[level].enemy3Count; i++) {
+        this.time.delayedCall(1500 + i * 200, () => {
+          if (!gameStarted || isPaused || isPlayerDead || bossAppeared) return;
+          const spacing = this.scale.width / (levelConfig[level].enemy3Count + 1);
+          const x3 = spacing * (i + 1);
+          const enemy3 = this.enemies.create(x3, -50, 'enemy3');
+          enemy3.enemyType = 'enemy3';
+          enemy3.setVelocityY(180);
+          enemy3.setScale(0.2);
+          enemy3.body.setSize(enemy3.width * 0.6, enemy3.height * 0.6);
+          enemy3.hitCount = 0;
+          enemy3.isHit = false;
+          enemy3.play('fly');
+        });
+      }
     },
     loop: true
   });
@@ -608,18 +629,18 @@ function initCollisions () {
       } else {
         const helper = this.helpers.create(enemy.x, enemy.y, 'helper3');
         helper.setScale(0.13);
-        helper.setVelocityY(100);
+        helper.setVelocityY(180);
         enemy.destroy();
       }
     } else if (enemy.enemyType === 'enemy2') { // 바위
       if (enemy.hitCount === 1) {
-        enemy.setScale(0.15);
-      } else if (enemy.hitCount === 2) {
-        enemy.setScale(0.12);
+        enemy.setScale(0.2);
       } else {
-        const helper = this.helpers.create(enemy.x, enemy.y, 'helper3');
-        helper.setScale(0.13);
-        helper.setVelocityY(100);
+        for (let i = -1; i <= 1; i += 2) {
+          const helper = this.helpers.create(enemy.x + i * 10, enemy.y, 'helper3');
+          helper.setScale(0.13);
+          helper.setVelocityY(180);
+        }
         enemy.destroy();
       }
     } else if (enemy.enemyType === 'enemy3') { // 방울뱀
@@ -666,27 +687,62 @@ function initCollisions () {
               this.bossBgm && this.bossBgm.stop();
               this.coinBgm && this.coinBgm.play();
 
-              for (let row = 0; row < 9; row++) {
-                for (let col = 0; col < 5; col++) {
-                  if (row === 4 && col === 2) continue;
-                  const offsetX = (col - 2) * 40;
-                  const offsetY = (row - 4) * 40;
-                  const helper = this.helpers.create(this.scale.width / 2 + offsetX, enemy.y + offsetY, 'helper3');
-                  helper.setScale(0.13);
-                  helper.setVelocityY(100);
-                }
-              }
+              // for (let row = 0; row < 9; row++) {
+              //   for (let col = 0; col < 5; col++) {
+              //     if (row === 4 && col === 2) continue;
+              //     const offsetX = (col - 2) * 40;
+              //     const offsetY = (row - 4) * 40;
+              //     const helper = this.helpers.create(this.scale.width / 2 + offsetX, this.scale.height / 2 + offsetY, 'helper3');
+              //     helper.setScale(0.13);
+              //   }
+              // }
 
               // 가운데에 walkie 추가
-              const walkie = this.helpers.create(this.scale.width / 2, enemy.y, 'walkie');
-              walkie.setScale(0.3);
-              walkie.setVelocityY(100);
+              // const walkie = this.helpers.create(this.scale.width / 2, this.scale.height / 2, 'walkie');
+              // walkie.setScale(0.3);
 
+              // 레벨에 따라 walkieCount에 따라 walkie 추가
+              for (let i = 0; i < levelConfig[level].walkieCount; i++) {
+                const spacing = 40;
+                const offsetX = (i - (levelConfig[level].walkieCount - 1) / 2) * spacing;
+                const walkie = this.helpers.create(this.scale.width / 2 + offsetX, this.scale.height / 2, 'walkie');
+                walkie.setScale(0.3);
+              }
+
+              // 랜덤된 위치에 helpler3 추가 (walkie와 겹치지 않고, 서로 겹치지 않게)
+              const helper3Count = 20;
+              const positions = [];
+              while (positions.length < helper3Count) {
+                const x = Phaser.Math.Between(20, this.scale.width - 20);
+                const y = Phaser.Math.Between(100, this.scale.height - 100);
+                const tooClose = positions.some(pos => Phaser.Math.Distance.Between(x, y, pos.x, pos.y) < 30);
+                const tooCloseToWalkie = Math.abs(x - this.scale.width / 2) < (levelConfig[level].walkieCount * 20 + 20) && Math.abs(y - this.scale.height / 2) < 30;
+                if (!tooClose && !tooCloseToWalkie) {
+                  positions.push({ x, y });
+                }
+              }
+              positions.forEach(pos => {
+                const helper = this.helpers.create(pos.x, pos.y, 'helper3');
+                helper.setScale(0.13);
+              });
+              
               this.time.delayedCall(7000, () => {
                 // 게임 정지
                 gameStarted = false;
                 this.coinBgm && this.coinBgm.stop();
                 this.nextBgm && this.nextBgm.play();
+                // 남아있는 helper3, walkie 모두 제거
+                let toRemove = [];
+                this.helpers.children.iterate(helper => toRemove.push(helper));
+                toRemove.forEach(helper => {
+                  this.tweens.add({
+                    targets: helper,
+                    alpha: 0,
+                    scale: 0,
+                    duration: 400,
+                    onComplete: () => helper && helper.body && helper.disableBody(true, true)
+                  });
+                });
               
                 // 현재 점수 화면 가운데 표시
                 const scoreDisplay = this.add.text(this.scale.width / 2, this.scale.height / 2 - 50, `점수: ${score}`, {
@@ -712,14 +768,34 @@ function initCollisions () {
                 });
                 levelDisplay.setOrigin(0.5);
 
+                // 레벨업
+                level++;
+                
+                if (level === finalLevel) {
+                  const clearText = this.add.text(this.scale.width / 2, this.scale.height / 2 - 120, `모든 레벨을 완료했어요!`, {
+                    fontFamily: 'PFStardustS',
+                    fontSize: '28px',
+                    fontStyle: 'bold',
+                    fill: '#ffbb00ff',
+                    align: 'center',
+                    stroke: '#ffffff',
+                    strokeThickness: 6,
+                    // 맨 앞에 위치
+                    depth: 30
+                  });
+                  clearText.setOrigin(0.5);
+                  // 게임 클리어
+                  setTimeout(() => {
+                    this.nextBgm && this.nextBgm.stop();
+                    this.finalSound && this.finalSound.play();
+                    this.sys.canvas.classList.add('disabled');
+                    wrongPopup.classList.add(ACT_ON);
+                    userScore.textContent = score;
+                  }, 5000);
+                  return;
+                }
+
                 setTimeout(async () => {
-                  // 레벨업
-                  level++;
-                  // 게임 재시작
-                  // 배경 변경(임시)
-                  const bgKey = level % 3 === 1 ? 'background' : (level % 3 === 2 ? 'background2' : 'background3');
-                  backgroundImg.setTexture(bgKey);
-                  backgroundImg.tilePositionY = 0;
                   gameStarted = true;
                   bossAppeared = false;
                   scoreDisplay.destroy();
@@ -728,8 +804,7 @@ function initCollisions () {
                   this.nextLevelSound && this.nextLevelSound.play();
                   await new Promise(resolve => setTimeout(resolve, 500));
                   this.bgm && this.bgm.play();
-                  // 적 생성 이벤트 재등록
-                  initEnemySpawns.call(this);
+                  initEnemySpawns.call(this); // 적 생성 이벤트 재등록
                 }, 5000);
               });
             }
@@ -742,7 +817,11 @@ function initCollisions () {
   // player vs enemy
   this.physics.add.overlap(player, this.enemies, (playerObj, enemy) => {
     if (isPlayerDead || isPaused) return;
-    enemy.destroy();
+    // enemy.destroy();
+    // enemy가 boss아닐 때만 destroy
+    if (enemy.enemyType !== 'boss1') {
+      enemy.destroy();
+    }
 
     if (playerObj.isProtected) {
       playerObj.isProtected = false;
@@ -757,9 +836,10 @@ function initCollisions () {
       gameStarted = false;
       isPlayerDead = true;
       gameOverCount++;
-      counts.forEach((count) => count.textContent = gameOverCount);
+      count.textContent = gameOverCount;
+      walkieCount.textContent = 2 * gameOverCount - 1;
 
-      if (tryCount < gameOverCount) {
+      if (tryCount < 2 * gameOverCount - 1) {
         requestBtn.disabled = true;
       }
 
@@ -773,6 +853,10 @@ function initCollisions () {
       setTimeout(() => {
         quizBox.classList.remove(ACT_ON);
         alertBox.classList.add(ACT_ON);
+
+        playerObj.x = this.scale.width / 2;
+        playerObj.y = this.scale.height - 80;
+        playerShake = 5;
       }, 2000);
     }
   }, null, this);
@@ -796,9 +880,10 @@ function initCollisions () {
       isPlayerDead = true;
 
       gameOverCount++;
-      counts.forEach((count) => count.textContent = gameOverCount);
+      count.textContent = gameOverCount;
+      walkieCount.textContent = 2 * gameOverCount - 1;
 
-      if (tryCount < gameOverCount) {
+      if (tryCount < 2 * gameOverCount - 1) {
         requestBtn.disabled = true;
       }
 
@@ -817,17 +902,17 @@ function initCollisions () {
   }, null, this);
 }
 
-function initPlayerShooting() {
+function initPlayerShooting() { // 플레이어 총알 발사
   this.playerBullets = this.physics.add.group(); // 플레이어 총알 그룹
   this.time.addEvent({ // 플레이어가 총알 발사
-    delay: 300, 
+    delay: 500, 
     callback: () => {
       if (!gameStarted || isPaused || isPlayerDead) return;
       if (player.isDouble) { // 두발 발사
         const bullet1 = this.playerBullets.create(player.x - 10, player.y - 20, 'playerBullet');
         const bullet2 = this.playerBullets.create(player.x + 10, player.y - 20, 'playerBullet');
-        bullet1.body.setSize(bullet1.width * 0.5, bullet1.height * 0.5);
-        bullet2.body.setSize(bullet2.width * 0.5, bullet2.height * 0.5);
+        bullet1.body.setSize(bullet1.width * 0.8, bullet1.height * 0.8);
+        bullet2.body.setSize(bullet2.width * 0.8, bullet2.height * 0.8);
         bullet1.setVelocityY(-300);
         bullet1.setScale(0.08);
         bullet2.setVelocityY(-300);
@@ -836,14 +921,14 @@ function initPlayerShooting() {
         const bullet = this.playerBullets.create(player.x, player.y - 20, 'playerBullet');
         bullet.setVelocityY(-300);
         bullet.setScale(0.08);
-        bullet.body.setSize(bullet.width * 0.5, bullet.height * 0.5);
+        bullet.body.setSize(bullet.width * 0.8, bullet.height * 0.8);
       }
     },
     loop: true
   });
 }
 
-function initBossShooting() {
+function initBossShooting() { // 보스 총알 발사
   this.bossBullets = this.physics.add.group(); // 보스 총알 그룹
 
   this.time.addEvent({ // 보스가 총알 발사
@@ -978,7 +1063,9 @@ function startGame() {
   // 타이틀과 버튼 제거
   titleText.destroy();
   startButton.destroy();
-  backgroundImg = this.add.tileSprite(0, 0, this.scale.width, this.scale.height, 'background').setOrigin(0);  // 배경 추가
+  backgroundImg = this.add.tileSprite(0, 0, this.scale.width, this.scale.height, 'background')
+  .setOrigin(0)
+  .setScrollFactor(0);
 
   // ------------------------------------------------------------------------------------------ 플레이어 생성
   player = this.physics.add.sprite(this.scale.width / 2, this.scale.height - 80, 'player'); // 플레이어 추가
@@ -1028,7 +1115,7 @@ window.onload = () => {
     distance = 0;
     gameOverCount = 0;
     level = 1;
-    counts.forEach(count => count.textContent = repairCount);
+    count.textContent = repairCount;
     requestBtn.disabled = false;
   });
 
@@ -1038,7 +1125,6 @@ window.onload = () => {
       game.scene.scenes[0].buttonSound.play();
     }
     quizContainer.classList.add(ACT_ON);
-    answer.value = '';
 
     repairCount++;
     if (repairText) repairText.setText(repairCount);
@@ -1052,12 +1138,27 @@ window.onload = () => {
 
     const randomNum = Phaser.Math.Between(0, quizData.length - 1);
     const randomQuiz = quizData[randomNum];
+    const examples = randomQuiz.examples;
     question.textContent = randomQuiz.question;
     answer.setAttribute('data-answer', randomQuiz.answer);
+    // examples만큼 js-quizItem div 생성
+    answer.innerHTML = '';
+    examples.forEach((example) => {
+      const exDiv = document.createElement('div');
+      exDiv.classList.add('js-quizItem');
+      exDiv.textContent = example;
+      exDiv.addEventListener('click', () => {
+        const allItems = document.querySelectorAll('.js-quizItem');
+        allItems.forEach(item => item.classList.remove('selected'));
+        exDiv.classList.toggle('selected');
+        answer.setAttribute('data-user-answer', exDiv.textContent);
+      });
+      answer.appendChild(exDiv);
+    });
   });
 
   submitBtn.addEventListener('click', async () => { // 제출 버튼
-    const userAnswer = answer.value.trim();
+    const userAnswer = answer.getAttribute('data-user-answer') || '';
     const correctAnswer = answer.getAttribute('data-answer');
 
     if (userAnswer === '') return; // 빈 값일 때는 무시
@@ -1091,9 +1192,6 @@ window.onload = () => {
           } else {
             clearInterval(countdownInterval);
             countdownText.destroy();
-            // 화면에 있는 적들과 아이템들 제거
-            // game.scene.scenes[0].enemies.clear(true, true);
-            // game.scene.scenes[0].helpers.clear(true, true);
             game.scene.scenes[0].physics.resume();
 
             gameStarted = true;
@@ -1108,7 +1206,12 @@ window.onload = () => {
     } else { // 오답일 때, 게임 오버
       game.scene.scenes[0].incorrectSound && game.scene.scenes[0].incorrectSound.play();
       gameOverCount++;
-      counts.forEach((count) => count.textContent = gameOverCount);
+      // counts.forEach((count) => count.textContent = gameOverCount);
+      count.textContent = gameOverCount;
+      walkieCount.textContent = 2 * gameOverCount - 1;
+      if (tryCount < 2 * gameOverCount - 1) {
+        requestBtn.disabled = true;
+      }
       quizContainer.classList.remove(ACT_ON);
       alertBox.setAttribute('data-type', 'wrong');
       alertBox.classList.add(ACT_ON);

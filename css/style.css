@@ -173,16 +173,32 @@ canvas.disabled {
   top: 80px;
 }
 
-.answerBox {
+.quizItemBox {
   width: calc(100% - 200px);
-  height: 60px;
+  height: max-content;
+  max-height: 140px;
 
   position: absolute;
   bottom: 180px;
+  font-size: 1.8rem;
 
   display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
   justify-content: center;
   align-items: center;
+}
+
+.quizItemBox div {
+  border: dashed 2px #333;
+  padding: 10px 20px;
+  cursor: pointer;
+}
+
+.quizItemBox div.selected {
+  background: #333;
+  color: #fff;
+  border: dashed 2px #fff;
 }
 
 .submitBtn {
